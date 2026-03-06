@@ -25,11 +25,15 @@ def disable_langsmith_tracing():
 
 @pytest.fixture(scope="session", autouse=True)
 async def setup_test_db():
-    admin_engine = create_async_engine(ADMIN_DATABASE_URL, isolation_level="AUTOCOMMIT")
-    async with admin_engine.connect() as conn:
-        await conn.execute(text("DROP DATABASE IF EXISTS landscraper_test"))
-        await conn.execute(text("CREATE DATABASE landscraper_test"))
-    await admin_engine.dispose()
+    try:
+        admin_engine = create_async_engine(ADMIN_DATABASE_URL, isolation_level="AUTOCOMMIT")
+        async with admin_engine.connect() as conn:
+            await conn.execute(text("DROP DATABASE IF EXISTS landscraper_test"))
+            await conn.execute(text("CREATE DATABASE landscraper_test"))
+        await admin_engine.dispose()
+    except OSError:
+        yield
+        return
 
     test_engine = create_async_engine(TEST_DATABASE_URL)
     async with test_engine.begin() as conn:

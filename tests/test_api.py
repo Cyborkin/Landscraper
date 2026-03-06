@@ -1,19 +1,79 @@
 """Tests for the FastAPI REST API."""
 
+import uuid
+from datetime import datetime, timezone
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, patch
+
 import pytest
 from fastapi.testclient import TestClient
 
-from landscraper.api.main import app, _leads_store, store_leads
+from landscraper.api.main import app
 from landscraper.api.tenant_registry import register_default_tenant
+
+
+POC_TENANT_ID = uuid.uuid4()
+
+
+def _make_dev(**overrides):
+    """Build a fake Development object with sensible defaults."""
+    defaults = dict(
+        id=uuid.uuid4(),
+        permit_number=None,
+        permit_type=None,
+        permit_status=None,
+        jurisdiction=None,
+        address_street=None,
+        address_city=None,
+        address_state="CO",
+        address_zip=None,
+        county=None,
+        latitude=None,
+        longitude=None,
+        property_type=None,
+        project_name=None,
+        description=None,
+        valuation_usd=None,
+        unit_count=None,
+        total_sqft=None,
+        owner_name=None,
+        confidence_score=0.0,
+        source_count=1,
+        sources=[],
+        filing_date=None,
+        discovered_at=datetime.now(tz=timezone.utc),
+        updated_at=None,
+        tags=[],
+        score_breakdown={},
+        validation_status=None,
+        lead_score=0,
+        tier="cold",
+    )
+    defaults.update(overrides)
+    return SimpleNamespace(**defaults)
+
+
+def _make_lead(dev, **overrides):
+    """Build a fake Lead object linked to a development."""
+    defaults = dict(
+        id=uuid.uuid4(),
+        tenant_id=POC_TENANT_ID,
+        development_id=dev.id,
+        lead_type="development",
+        lead_score=dev.lead_score,
+        tier=dev.tier,
+        status="new",
+    )
+    defaults.update(overrides)
+    return SimpleNamespace(**defaults)
 
 
 @pytest.fixture(autouse=True)
 def setup_api():
-    """Register default tenant and clear leads store before each test."""
+    """Register default tenant and set poc_tenant_id on app state."""
     register_default_tenant()
-    _leads_store.clear()
+    app.state.poc_tenant_id = POC_TENANT_ID
     yield
-    _leads_store.clear()
 
 
 client = TestClient(app)
@@ -39,7 +99,14 @@ def test_list_leads_bad_key():
     assert response.status_code == 401
 
 
-def test_list_leads_empty():
+@patch("landscraper.api.main.db_list_leads", new_callable=AsyncMock)
+@patch("landscraper.api.main.async_session")
+def test_list_leads_empty(mock_session_factory, mock_list):
+    mock_session = AsyncMock()
+    mock_session_factory.return_value.__aenter__ = AsyncMock(return_value=mock_session)
+    mock_session_factory.return_value.__aexit__ = AsyncMock(return_value=False)
+    mock_list.return_value = ([], 0)
+
     response = client.get("/api/v1/leads", headers=AUTH_HEADER)
     assert response.status_code == 200
     data = response.json()
@@ -47,33 +114,22 @@ def test_list_leads_empty():
     assert data["leads"] == []
 
 
-def test_list_leads_with_data():
-    store_leads([
-        {
-            "lead_id": "test-lead-1",
-            "permit_number": "BLD-001",
-            "address_city": "Denver",
-            "county": "Denver",
-            "lead_score": 75,
-            "tier": "warm",
-            "property_type": "multifamily",
-            "confidence_score": 0.8,
-            "source_count": 2,
-            "sources": ["src_a", "src_b"],
-        },
-        {
-            "lead_id": "test-lead-2",
-            "permit_number": "BLD-002",
-            "address_city": "Boulder",
-            "county": "Boulder",
-            "lead_score": 45,
-            "tier": "monitor",
-            "property_type": "single_family",
-            "confidence_score": 0.5,
-            "source_count": 1,
-            "sources": ["src_a"],
-        },
-    ])
+@patch("landscraper.api.main.db_list_leads", new_callable=AsyncMock)
+@patch("landscraper.api.main.async_session")
+def test_list_leads_with_data(mock_session_factory, mock_list):
+    mock_session = AsyncMock()
+    mock_session_factory.return_value.__aenter__ = AsyncMock(return_value=mock_session)
+    mock_session_factory.return_value.__aexit__ = AsyncMock(return_value=False)
+
+    dev1 = _make_dev(permit_number="BLD-001", address_city="Denver", county="Denver",
+                     lead_score=75, tier="warm", property_type="multifamily",
+                     confidence_score=0.8, source_count=2, sources=["src_a", "src_b"])
+    dev2 = _make_dev(permit_number="BLD-002", address_city="Boulder", county="Boulder",
+                     lead_score=45, tier="monitor", property_type="single_family",
+                     confidence_score=0.5, source_count=1, sources=["src_a"])
+    lead1 = _make_lead(dev1)
+    lead2 = _make_lead(dev2)
+    mock_list.return_value = ([(dev1, lead1), (dev2, lead2)], 2)
 
     response = client.get("/api/v1/leads", headers=AUTH_HEADER)
     assert response.status_code == 200
@@ -82,11 +138,16 @@ def test_list_leads_with_data():
     assert len(data["leads"]) == 2
 
 
-def test_list_leads_filter_tier():
-    store_leads([
-        {"lead_id": "hot-1", "tier": "hot", "lead_score": 85},
-        {"lead_id": "warm-1", "tier": "warm", "lead_score": 60},
-    ])
+@patch("landscraper.api.main.db_list_leads", new_callable=AsyncMock)
+@patch("landscraper.api.main.async_session")
+def test_list_leads_filter_tier(mock_session_factory, mock_list):
+    mock_session = AsyncMock()
+    mock_session_factory.return_value.__aenter__ = AsyncMock(return_value=mock_session)
+    mock_session_factory.return_value.__aexit__ = AsyncMock(return_value=False)
+
+    dev = _make_dev(tier="hot", lead_score=85)
+    lead = _make_lead(dev)
+    mock_list.return_value = ([(dev, lead)], 1)
 
     response = client.get("/api/v1/leads?tier=hot", headers=AUTH_HEADER)
     data = response.json()
@@ -94,31 +155,53 @@ def test_list_leads_filter_tier():
     assert data["leads"][0]["tier"] == "hot"
 
 
-def test_list_leads_filter_county():
-    store_leads([
-        {"lead_id": "d1", "county": "Denver", "tier": "warm"},
-        {"lead_id": "b1", "county": "Boulder", "tier": "warm"},
-    ])
+@patch("landscraper.api.main.db_list_leads", new_callable=AsyncMock)
+@patch("landscraper.api.main.async_session")
+def test_list_leads_filter_county(mock_session_factory, mock_list):
+    mock_session = AsyncMock()
+    mock_session_factory.return_value.__aenter__ = AsyncMock(return_value=mock_session)
+    mock_session_factory.return_value.__aexit__ = AsyncMock(return_value=False)
+
+    dev = _make_dev(county="Denver", tier="warm")
+    lead = _make_lead(dev)
+    mock_list.return_value = ([(dev, lead)], 1)
 
     response = client.get("/api/v1/leads?county=Denver", headers=AUTH_HEADER)
     data = response.json()
     assert data["meta"]["total_count"] == 1
 
 
-def test_list_leads_min_score():
-    store_leads([
-        {"lead_id": "high", "lead_score": 80, "tier": "hot"},
-        {"lead_id": "low", "lead_score": 30, "tier": "monitor"},
-    ])
+@patch("landscraper.api.main.db_list_leads", new_callable=AsyncMock)
+@patch("landscraper.api.main.async_session")
+def test_list_leads_min_score(mock_session_factory, mock_list):
+    mock_session = AsyncMock()
+    mock_session_factory.return_value.__aenter__ = AsyncMock(return_value=mock_session)
+    mock_session_factory.return_value.__aexit__ = AsyncMock(return_value=False)
+
+    lead_id = uuid.uuid4()
+    dev = _make_dev(lead_score=80, tier="hot")
+    lead = _make_lead(dev, id=lead_id)
+    mock_list.return_value = ([(dev, lead)], 1)
 
     response = client.get("/api/v1/leads?min_score=50", headers=AUTH_HEADER)
     data = response.json()
     assert data["meta"]["total_count"] == 1
-    assert data["leads"][0]["lead_id"] == "high"
+    assert data["leads"][0]["lead_id"] == str(lead_id)
 
 
-def test_list_leads_pagination():
-    store_leads([{"lead_id": f"lead-{i}", "tier": "warm"} for i in range(5)])
+@patch("landscraper.api.main.db_list_leads", new_callable=AsyncMock)
+@patch("landscraper.api.main.async_session")
+def test_list_leads_pagination(mock_session_factory, mock_list):
+    mock_session = AsyncMock()
+    mock_session_factory.return_value.__aenter__ = AsyncMock(return_value=mock_session)
+    mock_session_factory.return_value.__aexit__ = AsyncMock(return_value=False)
+
+    items = []
+    for i in range(2):
+        dev = _make_dev(tier="warm")
+        lead = _make_lead(dev)
+        items.append((dev, lead))
+    mock_list.return_value = (items, 5)
 
     response = client.get("/api/v1/leads?page=1&page_size=2", headers=AUTH_HEADER)
     data = response.json()
@@ -127,18 +210,35 @@ def test_list_leads_pagination():
     assert data["meta"]["next_page_url"] is not None
 
 
-def test_get_lead():
-    store_leads([{"lead_id": "find-me", "tier": "hot", "permit_number": "BLD-X"}])
+@patch("landscraper.api.main.get_lead_by_id", new_callable=AsyncMock)
+@patch("landscraper.api.main.async_session")
+def test_get_lead(mock_session_factory, mock_get):
+    mock_session = AsyncMock()
+    mock_session_factory.return_value.__aenter__ = AsyncMock(return_value=mock_session)
+    mock_session_factory.return_value.__aexit__ = AsyncMock(return_value=False)
 
-    response = client.get("/api/v1/leads/find-me", headers=AUTH_HEADER)
+    lead_id = uuid.uuid4()
+    dev = _make_dev(tier="hot", permit_number="BLD-X")
+    lead = _make_lead(dev, id=lead_id)
+    mock_get.return_value = (dev, lead)
+
+    response = client.get(f"/api/v1/leads/{lead_id}", headers=AUTH_HEADER)
     assert response.status_code == 200
     data = response.json()
-    assert data["lead_id"] == "find-me"
+    assert data["lead_id"] == str(lead_id)
     assert data["permit_number"] == "BLD-X"
 
 
-def test_get_lead_not_found():
-    response = client.get("/api/v1/leads/nonexistent", headers=AUTH_HEADER)
+@patch("landscraper.api.main.get_lead_by_id", new_callable=AsyncMock)
+@patch("landscraper.api.main.async_session")
+def test_get_lead_not_found(mock_session_factory, mock_get):
+    mock_session = AsyncMock()
+    mock_session_factory.return_value.__aenter__ = AsyncMock(return_value=mock_session)
+    mock_session_factory.return_value.__aexit__ = AsyncMock(return_value=False)
+    mock_get.return_value = None
+
+    fake_id = uuid.uuid4()
+    response = client.get(f"/api/v1/leads/{fake_id}", headers=AUTH_HEADER)
     assert response.status_code == 404
 
 
@@ -157,25 +257,33 @@ def test_trigger_cycle():
     )
     assert response.status_code == 200
     data = response.json()
-    assert data["status"] == "triggered"
+    assert data["status"] == "running"
     assert data["cycle_id"] is not None
 
 
-def test_lead_response_structure():
+@patch("landscraper.api.main.get_lead_by_id", new_callable=AsyncMock)
+@patch("landscraper.api.main.async_session")
+def test_lead_response_structure(mock_session_factory, mock_get):
     """Verify the lead response includes nested address and coordinates."""
-    store_leads([{
-        "lead_id": "struct-test",
-        "address_street": "100 Main St",
-        "address_city": "Denver",
-        "address_state": "CO",
-        "address_zip": "80202",
-        "county": "Denver",
-        "latitude": 39.7392,
-        "longitude": -104.9903,
-        "tier": "hot",
-    }])
+    mock_session = AsyncMock()
+    mock_session_factory.return_value.__aenter__ = AsyncMock(return_value=mock_session)
+    mock_session_factory.return_value.__aexit__ = AsyncMock(return_value=False)
 
-    response = client.get("/api/v1/leads/struct-test", headers=AUTH_HEADER)
+    lead_id = uuid.uuid4()
+    dev = _make_dev(
+        address_street="100 Main St",
+        address_city="Denver",
+        address_state="CO",
+        address_zip="80202",
+        county="Denver",
+        latitude=39.7392,
+        longitude=-104.9903,
+        tier="hot",
+    )
+    lead = _make_lead(dev, id=lead_id)
+    mock_get.return_value = (dev, lead)
+
+    response = client.get(f"/api/v1/leads/{lead_id}", headers=AUTH_HEADER)
     data = response.json()
 
     assert data["address"]["street"] == "100 Main St"
@@ -184,15 +292,23 @@ def test_lead_response_structure():
     assert data["coordinates"]["latitude"] == 39.7392
 
 
-def test_lead_includes_score_breakdown():
-    store_leads([{
-        "lead_id": "bd-test",
-        "tier": "hot",
-        "lead_score": 85,
-        "score_breakdown": {"project_scale": 20, "permit_status": 15, "unit_count": 10},
-    }])
+@patch("landscraper.api.main.get_lead_by_id", new_callable=AsyncMock)
+@patch("landscraper.api.main.async_session")
+def test_lead_includes_score_breakdown(mock_session_factory, mock_get):
+    mock_session = AsyncMock()
+    mock_session_factory.return_value.__aenter__ = AsyncMock(return_value=mock_session)
+    mock_session_factory.return_value.__aexit__ = AsyncMock(return_value=False)
 
-    response = client.get("/api/v1/leads/bd-test", headers=AUTH_HEADER)
+    lead_id = uuid.uuid4()
+    dev = _make_dev(
+        tier="hot",
+        lead_score=85,
+        score_breakdown={"project_scale": 20, "permit_status": 15, "unit_count": 10},
+    )
+    lead = _make_lead(dev, id=lead_id)
+    mock_get.return_value = (dev, lead)
+
+    response = client.get(f"/api/v1/leads/{lead_id}", headers=AUTH_HEADER)
     data = response.json()
     assert data["score_breakdown"]["project_scale"] == 20
     assert data["score_breakdown"]["permit_status"] == 15

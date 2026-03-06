@@ -231,13 +231,13 @@ async def list_leads(
     min_score: int = 0,
     page: int = 1,
     page_size: int = 50,
-) -> tuple[list[Development], int]:
+) -> tuple[list[tuple[Development, Lead]], int]:
     """Query developments joined with leads, apply filters, paginate.
 
-    Returns (page_items, total_count). Ordered by lead_score DESC.
+    Returns (list of (Development, Lead) tuples, total_count). Ordered by lead_score DESC.
     """
     base = (
-        select(Development)
+        select(Development, Lead)
         .join(Lead, Lead.development_id == Development.id)
         .where(Lead.tenant_id == tenant_id)
     )
@@ -262,20 +262,23 @@ async def list_leads(
         .offset(offset)
         .limit(page_size)
     )
-    rows = (await session.execute(page_stmt)).scalars().all()
+    rows = (await session.execute(page_stmt)).all()
 
-    return list(rows), total
+    return [(row[0], row[1]) for row in rows], total
 
 
 async def get_lead_by_id(
     session: AsyncSession,
     lead_id: uuid.UUID,
     tenant_id: uuid.UUID,
-) -> Development | None:
-    """Get a single development by its Lead UUID, scoped to tenant."""
+) -> tuple[Development, Lead] | None:
+    """Get a single development + lead by Lead UUID, scoped to tenant."""
     result = await session.execute(
-        select(Development)
+        select(Development, Lead)
         .join(Lead, Lead.development_id == Development.id)
         .where(Lead.id == lead_id, Lead.tenant_id == tenant_id)
     )
-    return result.scalar_one_or_none()
+    row = result.one_or_none()
+    if row is None:
+        return None
+    return row[0], row[1]

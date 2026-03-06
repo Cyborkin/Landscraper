@@ -7,7 +7,7 @@ import uuid
 from contextlib import asynccontextmanager
 from typing import Annotated, Any
 
-from fastapi import BackgroundTasks, Depends, FastAPI, Query
+from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
 
@@ -24,11 +24,14 @@ from landscraper.api.schemas import (
     TriggerCycleRequest,
 )
 from landscraper.api.tenant_registry import register_default_tenant
+from landscraper.db import async_session
+from landscraper.db.crud import get_lead_by_id
+from landscraper.db.crud import list_leads as db_list_leads
+from landscraper.models.development import Development
+from landscraper.models.lead import Lead
 
 logger = logging.getLogger(__name__)
 
-# In-memory lead store for POC (production: database)
-_leads_store: list[dict[str, Any]] = []
 _last_cycle: dict[str, Any] = {"cycle_id": None, "status": "idle", "metrics": {}}
 
 
@@ -93,24 +96,23 @@ async def list_leads(
     page_size: int = Query(50, ge=1, le=200, description="Results per page"),
 ):
     """List development leads with optional filters."""
-    filtered = _leads_store
+    tenant_id = app.state.poc_tenant_id
 
-    if tier:
-        filtered = [l for l in filtered if l.get("tier") == tier]
-    if property_type:
-        filtered = [l for l in filtered if l.get("property_type") == property_type]
-    if county:
-        filtered = [l for l in filtered if l.get("county") == county]
-    if min_score > 0:
-        filtered = [l for l in filtered if l.get("lead_score", 0) >= min_score]
+    async with async_session() as session:
+        items, total = await db_list_leads(
+            session,
+            tenant_id,
+            tier=tier,
+            property_type=property_type,
+            county=county,
+            min_score=min_score,
+            page=page,
+            page_size=page_size,
+        )
 
-    total = len(filtered)
-    start = (page - 1) * page_size
-    end = start + page_size
-    page_items = filtered[start:end]
+    leads_out = [_dev_to_lead_out(dev, lead) for dev, lead in items]
 
-    leads_out = [_to_lead_out(l) for l in page_items]
-
+    end = page * page_size
     next_url = None
     if end < total:
         next_url = f"/api/v1/leads?page={page + 1}&page_size={page_size}"
@@ -134,13 +136,16 @@ async def get_lead(
     tenant: Annotated[dict, Depends(verify_api_key)],
 ):
     """Get a single lead by ID."""
-    for lead in _leads_store:
-        if lead.get("lead_id") == lead_id:
-            return _to_lead_out(lead)
+    tenant_id = app.state.poc_tenant_id
 
-    from fastapi import HTTPException
+    async with async_session() as session:
+        result = await get_lead_by_id(session, uuid.UUID(lead_id), tenant_id)
 
-    raise HTTPException(status_code=404, detail="Lead not found")
+    if result is None:
+        raise HTTPException(status_code=404, detail="Lead not found")
+
+    dev, lead = result
+    return _dev_to_lead_out(dev, lead)
 
 
 @app.get("/api/v1/cycle/status", response_model=CycleStatusResponse)
@@ -254,14 +259,6 @@ async def tracing_status(
     )
 
 
-def store_leads(leads: list[dict[str, Any]]) -> None:
-    """Store validated leads (called by delivery_node)."""
-    for lead in leads:
-        if "lead_id" not in lead:
-            lead["lead_id"] = str(uuid.uuid4())
-        _leads_store.append(lead)
-
-
 def update_cycle_status(cycle_id: str, status: str, metrics: dict | None = None) -> None:
     """Update cycle status (called by graph nodes)."""
     _last_cycle.update({
@@ -283,41 +280,41 @@ if _dashboard_dir:
     app.mount("/dashboard", StaticFiles(directory=_dashboard_dir, html=True), name="dashboard")
 
 
-def _to_lead_out(lead: dict[str, Any]) -> LeadOut:
-    """Convert internal lead dict to API response model."""
+def _dev_to_lead_out(dev: Development, lead: Lead) -> LeadOut:
+    """Convert Development + Lead ORM objects to API response model."""
     return LeadOut(
-        lead_id=lead.get("lead_id", ""),
-        confidence_score=lead.get("confidence_score", 0.0),
-        source_count=lead.get("source_count", 0),
-        sources=lead.get("sources", []),
-        lead_score=lead.get("lead_score", 0),
-        tier=lead.get("tier", "cold"),
-        score_breakdown=lead.get("score_breakdown", {}),
-        permit_number=lead.get("permit_number"),
-        permit_type=lead.get("permit_type"),
-        permit_status=lead.get("permit_status"),
-        jurisdiction=lead.get("jurisdiction"),
+        lead_id=str(lead.id),
+        confidence_score=dev.confidence_score or 0.0,
+        source_count=dev.source_count or 0,
+        sources=dev.sources or [],
+        lead_score=dev.lead_score or 0,
+        tier=dev.tier or "cold",
+        score_breakdown=dev.score_breakdown or {},
+        permit_number=dev.permit_number,
+        permit_type=dev.permit_type,
+        permit_status=dev.permit_status,
+        jurisdiction=dev.jurisdiction,
         address=AddressOut(
-            street=lead.get("address_street"),
-            city=lead.get("address_city"),
-            state=lead.get("address_state"),
-            zip=lead.get("address_zip"),
-            county=lead.get("county"),
+            street=dev.address_street,
+            city=dev.address_city,
+            state=dev.address_state,
+            zip=dev.address_zip,
+            county=dev.county,
         ),
         coordinates=CoordinatesOut(
-            latitude=lead.get("latitude"),
-            longitude=lead.get("longitude"),
+            latitude=dev.latitude,
+            longitude=dev.longitude,
         ),
-        property_type=lead.get("property_type"),
-        project_name=lead.get("project_name"),
-        description=lead.get("description"),
-        valuation_usd=lead.get("valuation_usd"),
-        unit_count=lead.get("unit_count"),
-        total_sqft=lead.get("total_sqft"),
-        owner_name=lead.get("owner_name"),
-        filing_date=lead.get("filing_date"),
-        discovered_at=lead.get("discovered_at"),
-        updated_at=lead.get("updated_at"),
-        tags=lead.get("tags", []),
-        validation_status=lead.get("validation_status"),
+        property_type=dev.property_type,
+        project_name=dev.project_name,
+        description=dev.description,
+        valuation_usd=dev.valuation_usd,
+        unit_count=dev.unit_count,
+        total_sqft=dev.total_sqft,
+        owner_name=dev.owner_name,
+        filing_date=dev.filing_date.isoformat() if dev.filing_date else None,
+        discovered_at=dev.discovered_at.isoformat() if dev.discovered_at else None,
+        updated_at=dev.updated_at.isoformat() if dev.updated_at else None,
+        tags=dev.tags or [],
+        validation_status=dev.validation_status,
     )

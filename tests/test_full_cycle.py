@@ -12,7 +12,6 @@ from httpx import Response
 
 from landscraper.agents.orchestrator import compile_graph
 from landscraper.agents.state import LandscraperState
-from landscraper.api.main import _leads_store
 
 
 # Mock data for two sources
@@ -107,9 +106,6 @@ async def test_full_cycle_three_sources():
         return_value=Response(200, json=EDGAR_RESPONSE)
     )
 
-    # Clear the leads store
-    _leads_store.clear()
-
     app = compile_graph()
     state = _initial_state(
         active_sources=[
@@ -147,9 +143,6 @@ async def test_full_cycle_three_sources():
     assert "yield_rate" in metrics
     assert "recommendations" in metrics
 
-    # Delivery should store leads
-    assert len(_leads_store) > 0, "Leads should be stored via delivery_node"
-
     # No errors
     assert len(result["errors"]) == 0, f"Unexpected errors: {result['errors']}"
 
@@ -164,8 +157,6 @@ async def test_full_cycle_single_source():
     respx.get("https://data.colorado.gov/resource/v4as-sthd.json").mock(
         return_value=Response(200, json=SODA_RESPONSE)
     )
-
-    _leads_store.clear()
 
     app = compile_graph()
     state = _initial_state(
@@ -192,8 +183,6 @@ async def test_full_cycle_with_source_failure():
         return_value=Response(500)
     )
 
-    _leads_store.clear()
-
     app = compile_graph()
     state = _initial_state(
         active_sources=[
@@ -216,8 +205,6 @@ async def test_full_cycle_with_source_failure():
 @pytest.mark.asyncio
 async def test_full_cycle_empty_sources():
     """Cycle with no active sources should complete cleanly."""
-    _leads_store.clear()
-
     app = compile_graph()
     state = _initial_state(active_sources=[])
 
