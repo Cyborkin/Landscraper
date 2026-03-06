@@ -30,21 +30,24 @@ def score_development(dev: dict[str, Any]) -> dict[str, Any]:
             breakdown["project_scale"] = 14
         elif val >= 500_000:
             breakdown["project_scale"] = 8
+        elif val > 0:
+            breakdown["project_scale"] = 4
         else:
             breakdown["project_scale"] = 3
     else:
-        breakdown["project_scale"] = 5  # unknown
+        breakdown["project_scale"] = 7  # unknown — don't penalize missing data
 
     # 2. Permit Status / Timeline (15 pts)
-    status = dev.get("permit_status", "").lower()
+    status = dev.get("permit_status", "").lower().strip()
     status_scores = {
-        "issued": 15, "in_progress": 15,
-        "approved": 12, "final": 12,
-        "under_review": 9,
-        "applied": 6,
-        "pre_application": 3,
+        "issued": 15, "issued full": 15, "in_progress": 15,
+        "approved": 12, "final": 12, "complete": 12, "completed": 12,
+        "under_review": 9, "routed for review": 9, "in review": 9, "review": 9,
+        "resubmittal requested": 9,
+        "applied": 6, "submitted": 6, "pending": 6,
+        "pre_application": 3, "luc hold": 3, "hold": 3,
     }
-    breakdown["permit_status"] = status_scores.get(status, 3)
+    breakdown["permit_status"] = status_scores.get(status, 4)
 
     # 3. Unit Count (10 pts)
     units = dev.get("unit_count")
@@ -58,18 +61,19 @@ def score_development(dev: dict[str, Any]) -> dict[str, Any]:
         else:
             breakdown["unit_count"] = 2
     else:
-        breakdown["unit_count"] = 3  # unknown
+        breakdown["unit_count"] = 4  # unknown — don't penalize missing data
 
     # 4. Property Type Fit (10 pts)
-    ptype = dev.get("property_type", "").lower()
+    ptype = dev.get("property_type", "").lower().replace("-", "_").replace(" ", "_")
     ptype_scores = {
-        "multifamily": 10, "mixed_use": 10,
-        "townhome": 7,
-        "single_family": 5,
-        "active_adult": 5,
-        "manufactured": 3,
+        "multifamily": 10, "multi_family": 10, "mixed_use": 10, "mixed": 10,
+        "townhome": 7, "townhouse": 7, "duplex": 7, "condo": 7, "condos": 7,
+        "single_family": 6, "residential": 6,
+        "active_adult": 5, "senior": 5,
+        "manufactured": 3, "industrial": 3,
+        "commercial": 4,
     }
-    breakdown["property_type_fit"] = ptype_scores.get(ptype, 3)
+    breakdown["property_type_fit"] = ptype_scores.get(ptype, 4)
 
     # 5. Location Demand (10 pts) — based on county
     county = dev.get("county", "")
@@ -87,9 +91,9 @@ def score_development(dev: dict[str, Any]) -> dict[str, Any]:
         "llc": 6,
         "trust": 4,
         "individual": 2,
-        "unknown": 1,
+        "unknown": 3,
     }
-    breakdown["owner_entity_type"] = entity_scores.get(entity, 1)
+    breakdown["owner_entity_type"] = entity_scores.get(entity, 3)
 
     # 7. Contact Completeness (10 pts)
     contact_fields = [
@@ -98,12 +102,12 @@ def score_development(dev: dict[str, Any]) -> dict[str, Any]:
         dev.get("owner_email"),
     ]
     filled = sum(1 for f in contact_fields if f)
-    contact_scores = {3: 10, 2: 7, 1: 3, 0: 0}
+    contact_scores = {3: 10, 2: 7, 1: 4, 0: 2}
     breakdown["contact_completeness"] = contact_scores[filled]
 
     # 8. Recency (7 pts) — based on filing_date
     filing = dev.get("filing_date")
-    breakdown["recency"] = _score_recency(filing)
+    breakdown["recency"] = _score_recency(filing)  # defaults to 2 if no date
 
     # 9. Confidence Score (5 pts)
     conf = dev.get("confidence_score", 0.0)
@@ -146,7 +150,7 @@ def score_development(dev: dict[str, Any]) -> dict[str, Any]:
 def _score_recency(filing_date: str | None) -> int:
     """Score based on how recently the filing was made."""
     if not filing_date:
-        return 1
+        return 2
 
     try:
         if isinstance(filing_date, str):
@@ -170,4 +174,4 @@ def _score_recency(filing_date: str | None) -> int:
         else:
             return 1
     except (ValueError, TypeError):
-        return 1
+        return 2

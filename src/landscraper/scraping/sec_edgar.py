@@ -1,6 +1,7 @@
 """SEC EDGAR scraper for publicly traded homebuilder filings.
 
-Queries the EDGAR full-text search API for Colorado-related filings.
+Queries the EDGAR company submissions API for 10-K/10-Q filings
+from major homebuilders active in Colorado.
 Low complexity — public REST API.
 """
 
@@ -10,63 +11,84 @@ import httpx
 
 from .base import BaseScraper
 
-EDGAR_SEARCH_URL = "https://efts.sec.gov/LATEST/search-index"
-EDGAR_FULLTEXT_URL = "https://efts.sec.gov/LATEST/search-index"
+# EDGAR company submissions API (no auth required, just User-Agent)
+EDGAR_SUBMISSIONS_URL = "https://data.sec.gov/submissions/CIK{cik}.json"
 
 # Major publicly traded homebuilders active in Colorado
 HOMEBUILDERS = {
     "0000920760": "Lennar Corporation",
-    "0000045012": "D.R. Horton",
+    "0000882184": "D.R. Horton",
     "0000795266": "KB Home",
     "0001514991": "Taylor Morrison",
     "0001502554": "Meritage Homes",
     "0000799292": "MDC Holdings (Richmond American)",
 }
 
-# EDGAR full-text search API
-EDGAR_API = "https://efts.sec.gov/LATEST/search-index"
+# Filing types we care about
+TARGET_FORMS = {"10-K", "10-Q", "8-K"}
 
 
 class SECEdgarScraper(BaseScraper):
     source_name = "sec_edgar"
     source_type = "api"
 
-    def __init__(self, query: str = '"Colorado" AND ("new homes" OR "residential" OR "permits")'):
-        self.query = query
+    def __init__(self, max_filings_per_company: int = 5):
+        self.max_filings = max_filings_per_company
 
     async def scrape(self) -> list[dict[str, Any]]:
-        """Search EDGAR for Colorado-related homebuilder filings."""
-        url = "https://efts.sec.gov/LATEST/search-index"
-        params = {
-            "q": self.query,
-            "dateRange": "custom",
-            "startdt": "2025-01-01",
-            "enddt": "2026-12-31",
-            "forms": "10-K,10-Q,8-K",
+        """Fetch recent filings from EDGAR for each homebuilder."""
+        headers = {
+            "User-Agent": "Landscraper/0.1 (research@landscraper.io)",
+            "Accept": "application/json",
         }
-        headers = {"User-Agent": "Landscraper/0.1 (research@landscraper.io)"}
-
         records = []
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.get(url, params=params, headers=headers)
-            if response.status_code != 200:
-                return records
 
-            data = response.json()
-            hits = data.get("hits", {}).get("hits", [])
+        async with httpx.AsyncClient(timeout=30.0, headers=headers) as client:
+            for cik, company_name in HOMEBUILDERS.items():
+                try:
+                    url = EDGAR_SUBMISSIONS_URL.format(cik=cik)
+                    response = await client.get(url)
+                    if response.status_code != 200:
+                        continue
 
-            for hit in hits[:50]:  # Limit to 50 results
-                source_data = hit.get("_source", {})
-                raw = {
-                    "company_name": source_data.get("display_names", [""])[0],
-                    "cik": source_data.get("entity_id"),
-                    "form_type": source_data.get("form_type"),
-                    "filing_date": source_data.get("file_date"),
-                    "description": source_data.get("display_date_filed"),
-                    "filing_url": f"https://www.sec.gov/Archives/edgar/data/{source_data.get('entity_id', '')}/{source_data.get('file_num', '')}",
-                }
+                    data = response.json()
+                    filings = data.get("filings", {}).get("recent", {})
+                    forms = filings.get("form", [])
+                    dates = filings.get("filingDate", [])
+                    accessions = filings.get("accessionNumber", [])
+                    descriptions = filings.get("primaryDocDescription", [])
+                    primary_docs = filings.get("primaryDocument", [])
 
-                unique_key = f"sec_{raw['cik']}_{raw['form_type']}_{raw['filing_date']}"
-                records.append(self.make_record(raw, unique_key))
+                    count = 0
+                    for i in range(len(forms)):
+                        if forms[i] not in TARGET_FORMS:
+                            continue
+                        if count >= self.max_filings:
+                            break
+
+                        accession_no_dash = accessions[i].replace("-", "")
+                        filing_url = (
+                            f"https://www.sec.gov/Archives/edgar/data/"
+                            f"{cik.lstrip('0')}/{accession_no_dash}/"
+                            f"{primary_docs[i] if i < len(primary_docs) else ''}"
+                        )
+
+                        raw = {
+                            "company_name": company_name,
+                            "cik": cik,
+                            "form_type": forms[i],
+                            "filing_date": dates[i] if i < len(dates) else None,
+                            "description": (
+                                descriptions[i] if i < len(descriptions) else forms[i]
+                            ),
+                            "filing_url": filing_url,
+                        }
+
+                        unique_key = f"sec_{cik}_{forms[i]}_{dates[i]}"
+                        records.append(self.make_record(raw, unique_key))
+                        count += 1
+
+                except Exception:
+                    continue  # Skip failed companies, continue with others
 
         return records

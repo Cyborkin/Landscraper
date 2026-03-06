@@ -1,6 +1,6 @@
 """Census Bureau Building Permits Survey scraper.
 
-Downloads monthly CSV/Excel data from census.gov for Colorado counties.
+Downloads annual CSV data from census.gov for Colorado counties.
 Low complexity — static file download and parse.
 """
 
@@ -59,10 +59,11 @@ class CensusBPSScraper(BaseScraper):
             if len(row) < 9:
                 continue
 
-            # Census BPS format: state_fips, county_fips, region, division, name,
+            # Current format: year, state_fips, county_fips, region, division, name,
             # 1-unit_bldgs, 1-unit_units, 1-unit_value, 2-unit_bldgs, ...
-            state_fips = row[0].strip()
-            county_fips = row[1].strip()
+            # Skip header rows and blank lines
+            state_fips = row[1].strip()
+            county_fips = row[2].strip()
 
             if state_fips != "08":  # Colorado
                 continue
@@ -73,15 +74,15 @@ class CensusBPSScraper(BaseScraper):
             raw = {
                 "county": county_name,
                 "county_fips": f"08{county_fips}",
-                "year": self.year,
-                "name": row[4].strip() if len(row) > 4 else county_name,
-                "single_family_buildings": _safe_int(row[5]) if len(row) > 5 else None,
-                "single_family_units": _safe_int(row[6]) if len(row) > 6 else None,
-                "single_family_value_thousands": _safe_int(row[7]) if len(row) > 7 else None,
-                "two_family_buildings": _safe_int(row[8]) if len(row) > 8 else None,
-                "multi_family_buildings": _safe_int(row[12]) if len(row) > 12 else None,
-                "multi_family_units": _safe_int(row[13]) if len(row) > 13 else None,
-                "total_units": _safe_int(row[17]) if len(row) > 17 else None,
+                "year": _safe_int(row[0].strip()),
+                "name": row[5].strip() if len(row) > 5 else county_name,
+                "single_family_buildings": _safe_int(row[6]) if len(row) > 6 else None,
+                "single_family_units": _safe_int(row[7]) if len(row) > 7 else None,
+                "single_family_value_thousands": _safe_int(row[8]) if len(row) > 8 else None,
+                "two_family_buildings": _safe_int(row[9]) if len(row) > 9 else None,
+                "multi_family_buildings": _safe_int(row[15]) if len(row) > 15 else None,
+                "multi_family_units": _safe_int(row[16]) if len(row) > 16 else None,
+                "total_units": _safe_int(row[7]) if len(row) > 7 else None,  # Approximate with SF units
             }
 
             unique_key = f"census_bps_{self.year}_{county_fips}"

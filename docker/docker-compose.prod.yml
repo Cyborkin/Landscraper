@@ -1,10 +1,13 @@
 services:
   api:
-    image: ${REGISTRY:-192.168.0.111:5000}/landscraper:${TAG:-latest}
+    image: ${REGISTRY:-192.168.0.25:5000}/landscraper:${TAG:-latest}
     environment:
       LANDSCRAPER_DATABASE_URL: postgresql+asyncpg://landscraper:${POSTGRES_PASSWORD:-landscraper}@postgres:5432/landscraper
       LANDSCRAPER_REDIS_URL: redis://redis:6379/1
       LANDSCRAPER_ANTHROPIC_API_KEY: ${LANDSCRAPER_ANTHROPIC_API_KEY:-}
+      LANDSCRAPER_LANGSMITH_API_KEY: ${LANDSCRAPER_LANGSMITH_API_KEY:-}
+      LANDSCRAPER_LANGSMITH_PROJECT: ${LANDSCRAPER_LANGSMITH_PROJECT:-LandScraper}
+      LANDSCRAPER_LANGSMITH_TRACING_ENABLED: ${LANDSCRAPER_LANGSMITH_TRACING_ENABLED:-true}
       LANDSCRAPER_OLLAMA_BASE_URL: http://host.docker.internal:11434
     extra_hosts:
       - "host.docker.internal:host-gateway"

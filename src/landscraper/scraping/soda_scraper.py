@@ -13,10 +13,18 @@ from .base import BaseScraper
 # Socrata dataset endpoint for Colorado Building Permit Counts
 SODA_ENDPOINT = "https://data.colorado.gov/resource/v4as-sthd.json"
 
-# Front Range counties to filter
-FRONT_RANGE_COUNTIES = {
-    "Adams", "Arapahoe", "Boulder", "Broomfield", "Denver",
-    "Douglas", "El Paso", "Jefferson", "Larimer", "Weld",
+# Front Range county FIPS codes (Colorado state FIPS = 08)
+FRONT_RANGE_FIPS = {
+    "001": "Adams",
+    "005": "Arapahoe",
+    "013": "Boulder",
+    "014": "Broomfield",
+    "031": "Denver",
+    "035": "Douglas",
+    "041": "El Paso",
+    "059": "Jefferson",
+    "069": "Larimer",
+    "123": "Weld",
 }
 
 
@@ -28,9 +36,12 @@ class SodaScraper(BaseScraper):
         self.limit = limit
 
     async def scrape(self) -> list[dict[str, Any]]:
+        # Filter for Front Range counties and most recent year available
+        fips_list = ",".join(f"'{f}'" for f in FRONT_RANGE_FIPS)
         params = {
             "$limit": self.limit,
-            "$order": ":id",
+            "$where": f"countyfips in ({fips_list})",
+            "$order": "year DESC",
         }
 
         async with httpx.AsyncClient(timeout=30.0) as client:
@@ -41,20 +52,22 @@ class SodaScraper(BaseScraper):
         records = []
 
         for row in data:
-            county = row.get("county", "")
-            if county not in FRONT_RANGE_COUNTIES:
-                continue
+            county_fips = row.get("countyfips", "")
+            county_name = FRONT_RANGE_FIPS.get(county_fips, county_fips)
+            area = row.get("area", "")
 
             raw = {
-                "county": county,
+                "county": county_name,
+                "county_fips": f"08{county_fips}",
+                "area": area,
                 "year": row.get("year"),
-                "month": row.get("month"),
-                "permit_count": _safe_int(row.get("permits")),
-                "units": _safe_int(row.get("units")),
-                "valuation": _safe_int(row.get("valuation")),
+                "permit_count": _safe_int(row.get("cbbuildingpermit")),
+                "sdo_permit_count": _safe_int(row.get("sdobuildingpermit")),
+                "total_population": _safe_int(row.get("totalpopulation")),
+                "total_housing_units": _safe_int(row.get("totalhousingunits")),
             }
 
-            unique_key = f"soda_{county}_{row.get('year')}_{row.get('month')}"
+            unique_key = f"soda_{county_fips}_{area}_{row.get('year')}"
             records.append(self.make_record(raw, unique_key))
 
         return records

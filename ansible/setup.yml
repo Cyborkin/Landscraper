@@ -131,7 +131,7 @@
         dest: /etc/docker/daemon.json
         content: |
           {
-            "insecure-registries": ["192.168.0.111:5000"],
+            "insecure-registries": ["192.168.0.25:5000"],
             "default-runtime": "nvidia",
             "runtimes": {
               "nvidia": {
@@ -149,7 +149,7 @@
         dest: /etc/docker/daemon.json
         content: |
           {
-            "insecure-registries": ["192.168.0.111:5000"]
+            "insecure-registries": ["192.168.0.25:5000"]
           }
         mode: "0644"
       notify: Restart Docker

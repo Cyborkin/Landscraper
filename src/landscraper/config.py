@@ -18,7 +18,7 @@ class Settings(BaseSettings):
 
     # LangSmith
     langsmith_api_key: str = ""
-    langsmith_project: str = "landscraper"
+    langsmith_project: str = "LandScraper"
     langsmith_tracing_enabled: bool = True
 
     # Scraping
