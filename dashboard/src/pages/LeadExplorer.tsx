@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useLeads } from "@/lib/hooks";
 import TierBadge from "@/components/TierBadge";
+import LeadMap from "@/components/LeadMap";
 import type { LeadFilters } from "@/lib/types";
 
 const TIERS = ["", "hot", "warm", "monitor", "cold"];
@@ -13,12 +14,22 @@ const COUNTIES = [
 export default function LeadExplorer() {
   const navigate = useNavigate();
   const [filters, setFilters] = useState<LeadFilters>({ page_size: 50 });
+  const [selectedLeadId, setSelectedLeadId] = useState<string>();
   const { data, isLoading } = useLeads(filters);
 
   const leads = data?.leads ?? [];
 
   return (
     <div className="space-y-4">
+      {/* Map */}
+      <div className="h-72 overflow-hidden rounded-xl border border-border">
+        <LeadMap
+          leads={leads}
+          selectedId={selectedLeadId}
+          onSelect={(id) => setSelectedLeadId(id)}
+        />
+      </div>
+
       <div className="flex items-center gap-3 rounded-xl border border-border bg-surface p-3">
         <Select
           label="Tier"
