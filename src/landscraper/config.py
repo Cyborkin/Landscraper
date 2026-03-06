@@ -1,3 +1,6 @@
+import os
+
+from pydantic import model_validator
 from pydantic_settings import BaseSettings
 
 
@@ -28,6 +31,37 @@ class Settings(BaseSettings):
     # API
     api_host: str = "0.0.0.0"
     api_port: int = 8000
+
+    @model_validator(mode="before")
+    @classmethod
+    def _bridge_railway_env_vars(cls, values: dict) -> dict:
+        """Accept Railway's standard env vars as fallbacks.
+
+        Railway addons set DATABASE_URL, REDIS_URL, and PORT directly.
+        Map them to our LANDSCRAPER_-prefixed names when the prefixed
+        versions aren't explicitly set.
+        """
+        # DATABASE_URL — also convert postgres:// and postgresql:// to asyncpg
+        if not values.get("database_url") and not os.environ.get("LANDSCRAPER_DATABASE_URL"):
+            raw = os.environ.get("DATABASE_URL", "")
+            if raw:
+                url = raw.replace("postgres://", "postgresql+asyncpg://", 1)
+                url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
+                values["database_url"] = url
+
+        # REDIS_URL
+        if not values.get("redis_url") and not os.environ.get("LANDSCRAPER_REDIS_URL"):
+            raw = os.environ.get("REDIS_URL", "")
+            if raw:
+                values["redis_url"] = raw
+
+        # PORT
+        if not values.get("api_port") and not os.environ.get("LANDSCRAPER_API_PORT"):
+            port = os.environ.get("PORT", "")
+            if port:
+                values["api_port"] = int(port)
+
+        return values
 
 
 settings = Settings()
