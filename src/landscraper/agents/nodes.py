@@ -204,16 +204,29 @@ async def consensus_node(state: LandscraperState) -> dict[str, Any]:
 
 
 async def self_improvement_node(state: LandscraperState) -> dict[str, Any]:
-    """Phase 5: Evaluate cycle performance and adjust strategies.
+    """Evaluate cycle performance and generate strategy recommendations.
 
-    Tracks yield rate, false positive rate, source freshness, scrape success rate.
-    Suggests strategy modifications for next cycle.
+    Computes metrics from the cycle's data and suggests adjustments.
     """
-    # TODO Phase 6: Implement metric tracking and strategy evaluation
+    from landscraper.improvement import compute_cycle_metrics, evaluate_strategy
+
+    metrics = compute_cycle_metrics(
+        raw_data=state.get("raw_data", []),
+        developments=state.get("developments", []),
+        validated_leads=state.get("validated_leads", []),
+        errors=state.get("errors", []),
+    )
+
+    recommendations = evaluate_strategy(metrics)
+    metrics["recommendations"] = recommendations
+
+    rec_summary = "; ".join(r["recommendation"][:60] for r in recommendations)
+    logger.info("Self-improvement: %s", rec_summary)
+
     return {
         "current_phase": "delivery",
-        "cycle_metrics": {},
-        "messages": [],
+        "cycle_metrics": metrics,
+        "messages": [f"Self-improvement: {len(recommendations)} recommendations"],
         "errors": [],
     }
 
