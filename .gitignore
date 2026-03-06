@@ -40,3 +40,7 @@ htmlcov/
 
 # Scrapy
 *.log
+
+# Dashboard
+dashboard/node_modules/
+dashboard/dist/
