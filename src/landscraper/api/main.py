@@ -1,12 +1,13 @@
 """FastAPI application entry point."""
 
+import asyncio
 import logging
 import os
 import uuid
 from contextlib import asynccontextmanager
 from typing import Annotated, Any
 
-from fastapi import Depends, FastAPI, Query
+from fastapi import BackgroundTasks, Depends, FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
 
@@ -140,23 +141,82 @@ async def cycle_status(
     return CycleStatusResponse(**_last_cycle)
 
 
+DEFAULT_SOURCES = [
+    {"name": "colorado_soda_permits", "access_method": "api"},
+    {"name": "census_bps", "access_method": "api"},
+    {
+        "name": "bizwest_rss",
+        "access_method": "rss",
+        "url": "https://bizwest.com/category/real-estate-construction/feed/",
+        "keywords": ["permit", "development", "construction", "residential", "commercial"],
+    },
+    {
+        "name": "denver_planning_rss",
+        "access_method": "rss",
+        "url": "https://www.denvergov.org/Government/Agencies-Departments-Offices/Community-Planning-and-Development/rss",
+        "keywords": ["permit", "development", "rezoning", "construction"],
+    },
+]
+
+
 @app.post("/api/v1/cycle/trigger", response_model=CycleStatusResponse)
 async def trigger_cycle(
     body: TriggerCycleRequest,
+    background_tasks: BackgroundTasks,
     tenant: Annotated[dict, Depends(verify_api_key)],
 ):
     """Trigger a new data collection cycle."""
-    from landscraper.tracing import cycle_run_config
+    if _last_cycle.get("status") == "running":
+        return CycleStatusResponse(**_last_cycle)
 
     cycle_id = str(uuid.uuid4())
-    run_config = cycle_run_config(cycle_id)  # noqa: F841 — used when graph invocation is wired
+    sources = body.sources or DEFAULT_SOURCES
     _last_cycle.update({
         "cycle_id": cycle_id,
-        "status": "triggered",
+        "status": "running",
         "metrics": {},
     })
-    # TODO: invoke graph with: await compiled_graph.ainvoke(state, config=run_config)
+
+    background_tasks.add_task(_run_cycle, cycle_id, sources)
     return CycleStatusResponse(**_last_cycle)
+
+
+async def _run_cycle(cycle_id: str, sources: list[dict[str, Any]]) -> None:
+    """Execute the agent graph in the background."""
+    from landscraper.agents.orchestrator import compile_graph
+    from landscraper.tracing import cycle_run_config
+
+    run_config = cycle_run_config(cycle_id)
+    graph = compile_graph()
+
+    initial_state = {
+        "messages": [],
+        "current_phase": "discovery",
+        "cycle_id": cycle_id,
+        "active_sources": sources,
+        "raw_data": [],
+        "developments": [],
+        "builders": [],
+        "validated_leads": [],
+        "cycle_metrics": {},
+        "errors": [],
+    }
+
+    try:
+        logger.info("Cycle %s: starting with %d sources", cycle_id, len(sources))
+        result = await graph.ainvoke(initial_state, config=run_config)
+        logger.info(
+            "Cycle %s: complete — %d leads delivered",
+            cycle_id,
+            len(result.get("validated_leads", [])),
+        )
+    except Exception as e:
+        logger.error("Cycle %s: failed — %s", cycle_id, e, exc_info=True)
+        _last_cycle.update({
+            "cycle_id": cycle_id,
+            "status": "error",
+            "metrics": {"error": str(e)},
+        })
 
 
 @app.get("/api/v1/tracing/status", response_model=TracingStatusResponse)
