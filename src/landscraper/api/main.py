@@ -156,6 +156,7 @@ DEFAULT_SOURCES = [
     {"name": "census_bps", "access_method": "api"},
     {"name": "dola_demography", "access_method": "api"},
     {"name": "sec_edgar", "access_method": "api"},
+    {"name": "fred_building_permits", "access_method": "csv"},
     {"name": "fort_collins_permits", "access_method": "api"},
     {"name": "aurora_permits", "access_method": "api"},
     {"name": "denver_residential_permits", "access_method": "api"},

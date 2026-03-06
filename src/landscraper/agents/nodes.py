@@ -23,6 +23,7 @@ def _build_scraper(source: dict[str, Any]):
         ArcGISScraper,
         CensusBPSScraper,
         DOLAScraper,
+        FREDScraper,
         HttpxScraper,
         RSSFeedScraper,
         SECEdgarScraper,
@@ -41,6 +42,8 @@ def _build_scraper(source: dict[str, Any]):
         return SECEdgarScraper()
     elif source_name == "dola_demography":
         return DOLAScraper()
+    elif source_name == "fred_building_permits":
+        return FREDScraper()
     elif source_name in ARCGIS_SOURCES:
         return ArcGISScraper(source_name)
     elif access_method == "rss":
