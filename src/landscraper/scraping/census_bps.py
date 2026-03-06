@@ -1,0 +1,88 @@
+"""Census Bureau Building Permits Survey scraper.
+
+Downloads monthly CSV/Excel data from census.gov for Colorado counties.
+Low complexity — static file download and parse.
+"""
+
+import csv
+import io
+from typing import Any
+
+import httpx
+
+from .base import BaseScraper
+
+# Census BPS annual data URL pattern
+BPS_URL = "https://www2.census.gov/econ/bps/County/co{year}a.txt"
+
+# Front Range county FIPS codes (state FIPS 08 = Colorado)
+FRONT_RANGE_COUNTIES = {
+    "001": "Adams",
+    "005": "Arapahoe",
+    "013": "Boulder",
+    "014": "Broomfield",
+    "031": "Denver",
+    "035": "Douglas",
+    "041": "El Paso",
+    "059": "Jefferson",
+    "069": "Larimer",
+    "123": "Weld",
+}
+
+
+class CensusBPSScraper(BaseScraper):
+    source_name = "census_bps"
+    source_type = "api"
+
+    def __init__(self, year: int = 2025):
+        self.year = year
+
+    async def scrape(self) -> list[dict[str, Any]]:
+        url = BPS_URL.format(year=self.year)
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.get(url)
+            response.raise_for_status()
+
+        records = []
+        reader = csv.reader(io.StringIO(response.text))
+
+        for row in reader:
+            if len(row) < 9:
+                continue
+
+            # Census BPS format: state_fips, county_fips, region, division, name,
+            # 1-unit_bldgs, 1-unit_units, 1-unit_value, 2-unit_bldgs, ...
+            state_fips = row[0].strip()
+            county_fips = row[1].strip()
+
+            if state_fips != "08":  # Colorado
+                continue
+            if county_fips not in FRONT_RANGE_COUNTIES:
+                continue
+
+            county_name = FRONT_RANGE_COUNTIES[county_fips]
+            raw = {
+                "county": county_name,
+                "county_fips": f"08{county_fips}",
+                "year": self.year,
+                "name": row[4].strip() if len(row) > 4 else county_name,
+                "single_family_buildings": _safe_int(row[5]) if len(row) > 5 else None,
+                "single_family_units": _safe_int(row[6]) if len(row) > 6 else None,
+                "single_family_value_thousands": _safe_int(row[7]) if len(row) > 7 else None,
+                "two_family_buildings": _safe_int(row[8]) if len(row) > 8 else None,
+                "multi_family_buildings": _safe_int(row[12]) if len(row) > 12 else None,
+                "multi_family_units": _safe_int(row[13]) if len(row) > 13 else None,
+                "total_units": _safe_int(row[17]) if len(row) > 17 else None,
+            }
+
+            unique_key = f"census_bps_{self.year}_{county_fips}"
+            records.append(self.make_record(raw, unique_key))
+
+        return records
+
+
+def _safe_int(val: str) -> int | None:
+    try:
+        return int(val.strip().replace(",", ""))
+    except (ValueError, AttributeError):
+        return None

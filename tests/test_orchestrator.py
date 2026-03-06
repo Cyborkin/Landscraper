@@ -1,6 +1,8 @@
 import uuid
 
 import pytest
+import respx
+from httpx import Response
 
 from landscraper.agents.orchestrator import build_graph, compile_graph
 from landscraper.agents.state import LandscraperState
@@ -44,20 +46,32 @@ async def test_graph_runs_empty_cycle():
     assert len(result["errors"]) == 0
 
 
+@respx.mock
 @pytest.mark.asyncio
 async def test_graph_runs_with_sources():
     """A cycle with active sources should spawn collection specialists."""
+    # Mock the SODA and EDGAR APIs so the real scrapers succeed
+    respx.get("https://data.colorado.gov/resource/v4as-sthd.json").mock(
+        return_value=Response(200, json=[
+            {"county": "Adams", "year": "2025", "month": "01", "permits": "10", "units": "10", "valuation": "1000"},
+        ])
+    )
+    respx.get("https://efts.sec.gov/LATEST/search-index").mock(
+        return_value=Response(200, json={"hits": {"hits": []}})
+    )
+
     app = compile_graph()
     state = _initial_state(
         active_sources=[
-            {"id": "src_1", "name": "PPRBD", "url": "https://pprbd.org"},
-            {"id": "src_2", "name": "Census BPS", "url": "https://census.gov/bps"},
+            {"id": "src_1", "name": "colorado_soda_permits", "access_method": "api"},
+            {"id": "src_2", "name": "sec_edgar", "access_method": "api"},
         ]
     )
     result = await app.ainvoke(state)
 
     assert result["current_phase"] == "complete"
     assert len(result["errors"]) == 0
+    assert len(result["raw_data"]) >= 1
 
 
 def test_graph_has_expected_nodes():
