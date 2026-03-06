@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     anthropic_api_key: str = ""
     ollama_base_url: str = "http://localhost:11434"
     default_cloud_model: str = "claude-sonnet-4-20250514"
-    default_local_model: str = "mistral"
+    default_local_model: str = "qwen2.5:7b"
 
     # LangSmith
     langsmith_api_key: str = ""

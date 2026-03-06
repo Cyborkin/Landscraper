@@ -1,0 +1,199 @@
+---
+- name: Setup swarm1 — Docker, NVIDIA drivers, Ollama
+  hosts: swarm1
+  become: true
+  tasks:
+    # ── System basics ──────────────────────────────────────────────
+    - name: Update apt cache
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Install prerequisites
+      ansible.builtin.apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - gnupg
+          - lsb-release
+          - software-properties-common
+          - ubuntu-drivers-common
+          - pciutils
+        state: present
+
+    # ── NVIDIA GPU drivers ─────────────────────────────────────────
+    - name: Detect NVIDIA GPU
+      ansible.builtin.shell: lspci | grep -i nvidia
+      register: nvidia_check
+      changed_when: false
+      failed_when: false
+
+    - name: Install NVIDIA drivers (auto-detect best)
+      ansible.builtin.command: ubuntu-drivers install
+      when: nvidia_check.rc == 0
+      register: nvidia_install
+      changed_when: "'installed' in nvidia_install.stdout | default('')"
+
+    - name: Install NVIDIA Container Toolkit key
+      ansible.builtin.shell: |
+        curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | \
+          gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
+      args:
+        creates: /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
+      when: nvidia_check.rc == 0
+
+    - name: Add NVIDIA Container Toolkit repo
+      ansible.builtin.shell: |
+        curl -s -L https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list | \
+          sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | \
+          tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
+      args:
+        creates: /etc/apt/sources.list.d/nvidia-container-toolkit.list
+      when: nvidia_check.rc == 0
+
+    - name: Install NVIDIA Container Toolkit
+      ansible.builtin.apt:
+        name: nvidia-container-toolkit
+        state: present
+        update_cache: true
+      when: nvidia_check.rc == 0
+
+    # ── Docker ─────────────────────────────────────────────────────
+    - name: Add Docker GPG key
+      ansible.builtin.shell: |
+        install -m 0755 -d /etc/apt/keyrings
+        curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+        chmod a+r /etc/apt/keyrings/docker.asc
+      args:
+        creates: /etc/apt/keyrings/docker.asc
+
+    - name: Add Docker repo
+      ansible.builtin.shell: |
+        echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] \
+          https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo $VERSION_CODENAME) stable" | \
+          tee /etc/apt/sources.list.d/docker.list
+      args:
+        creates: /etc/apt/sources.list.d/docker.list
+
+    - name: Install Docker
+      ansible.builtin.apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-buildx-plugin
+          - docker-compose-plugin
+        state: present
+        update_cache: true
+
+    - name: Add swarm user to docker group
+      ansible.builtin.user:
+        name: swarm
+        groups: docker
+        append: true
+
+    - name: Enable and start Docker
+      ansible.builtin.systemd:
+        name: docker
+        enabled: true
+        state: started
+
+    - name: Configure Docker daemon (insecure registry + NVIDIA runtime)
+      ansible.builtin.copy:
+        dest: /etc/docker/daemon.json
+        content: |
+          {
+            "insecure-registries": ["swarm1:5000"],
+            "runtimes": {
+              "nvidia": {
+                "path": "nvidia-container-runtime",
+                "runtimeArgs": []
+              }
+            },
+            "default-runtime": "nvidia"
+          }
+        mode: "0644"
+      notify: Restart Docker
+      when: nvidia_check.rc == 0
+
+    - name: Configure Docker daemon (insecure registry, no GPU)
+      ansible.builtin.copy:
+        dest: /etc/docker/daemon.json
+        content: |
+          {
+            "insecure-registries": ["swarm1:5000"]
+          }
+        mode: "0644"
+      notify: Restart Docker
+      when: nvidia_check.rc != 0
+
+    # ── Docker Registry ────────────────────────────────────────────
+    - name: Start local Docker registry
+      community.docker.docker_container:
+        name: registry
+        image: registry:2
+        state: started
+        restart_policy: always
+        ports:
+          - "5000:5000"
+
+    # ── Ollama ─────────────────────────────────────────────────────
+    - name: Install Ollama
+      ansible.builtin.shell: curl -fsSL https://ollama.com/install.sh | sh
+      args:
+        creates: /usr/local/bin/ollama
+
+    - name: Create Ollama systemd service
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/ollama.service
+        content: |
+          [Unit]
+          Description=Ollama LLM Server
+          After=network-online.target
+
+          [Service]
+          ExecStart=/usr/local/bin/ollama serve
+          Restart=always
+          RestartSec=3
+          Environment="OLLAMA_HOST=0.0.0.0"
+
+          [Install]
+          WantedBy=multi-user.target
+        mode: "0644"
+      notify: Restart Ollama
+
+    - name: Enable and start Ollama
+      ansible.builtin.systemd:
+        name: ollama
+        enabled: true
+        state: started
+        daemon_reload: true
+
+    - name: Pull Qwen 2.5 7B model (fits 12GB GPU)
+      ansible.builtin.command: ollama pull qwen2.5:7b
+      register: ollama_pull
+      changed_when: "'pulling' in ollama_pull.stdout | default('')"
+      retries: 3
+      delay: 10
+
+    # ── App directory ──────────────────────────────────────────────
+    - name: Create app directory
+      ansible.builtin.file:
+        path: /opt/landscraper
+        state: directory
+        owner: swarm
+        group: swarm
+        mode: "0755"
+
+  handlers:
+    - name: Restart Docker
+      ansible.builtin.systemd:
+        name: docker
+        state: restarted
+
+    - name: Restart Ollama
+      ansible.builtin.systemd:
+        name: ollama
+        state: restarted
+        daemon_reload: true

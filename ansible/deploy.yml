@@ -1,6 +1,7 @@
 ---
-- name: Deploy Landscraper to Docker Swarm
-  hosts: swarm_manager
+- name: Deploy Landscraper
+  hosts: swarm1
+  become: true
   tasks:
     - name: Pull latest image
       community.docker.docker_image:
@@ -12,28 +13,48 @@
       ansible.builtin.copy:
         src: ../docker/docker-compose.prod.yml
         dest: /opt/landscraper/docker-compose.prod.yml
+        owner: swarm
         mode: "0644"
 
-    - name: Deploy stack
-      community.docker.docker_stack:
-        name: landscraper
-        compose:
-          - /opt/landscraper/docker-compose.prod.yml
-        state: present
-      environment:
-        REGISTRY: "{{ registry }}"
-        TAG: "{{ landscraper_tag }}"
-        POSTGRES_PASSWORD: "{{ postgres_password | default('landscraper') }}"
-        LANDSCRAPER_ANTHROPIC_API_KEY: "{{ anthropic_api_key | default('') }}"
+    - name: Copy env file
+      ansible.builtin.copy:
+        src: ../docker/.env.prod
+        dest: /opt/landscraper/.env
+        owner: swarm
+        mode: "0600"
+
+    - name: Deploy with docker compose
+      ansible.builtin.shell: |
+        cd /opt/landscraper && \
+        docker compose -f docker-compose.prod.yml pull && \
+        docker compose -f docker-compose.prod.yml up -d
+      register: deploy_result
+      changed_when: "'Started' in deploy_result.stdout or 'Recreated' in deploy_result.stdout"
+
+    - name: Wait for API to be healthy
+      ansible.builtin.uri:
+        url: "http://localhost:8000/health"
+        status_code: 200
+      register: health
+      retries: 10
+      delay: 5
+      until: health.status == 200
 
     - name: Run database migrations
-      community.docker.docker_container:
-        name: landscraper-migrate
-        image: "{{ registry }}/landscraper:{{ landscraper_tag }}"
-        command: alembic upgrade head
-        networks:
-          - name: landscraper_default
-        env:
-          LANDSCRAPER_DATABASE_URL: "postgresql+asyncpg://landscraper:{{ postgres_password | default('landscraper') }}@postgres:5432/landscraper"
-        auto_remove: true
-        state: started
+      ansible.builtin.shell: |
+        docker run --rm \
+          --network landscraper_default \
+          -e LANDSCRAPER_DATABASE_URL="postgresql+asyncpg://landscraper:{{ postgres_password | default('landscraper') }}@postgres:5432/landscraper" \
+          {{ registry }}/landscraper:{{ landscraper_tag }} \
+          alembic upgrade head
+      register: migrate_result
+      changed_when: "'Running upgrade' in migrate_result.stdout"
+
+    - name: Show deployment status
+      ansible.builtin.shell: docker compose -f /opt/landscraper/docker-compose.prod.yml ps
+      register: compose_ps
+      changed_when: false
+
+    - name: Print status
+      ansible.builtin.debug:
+        msg: "{{ compose_ps.stdout_lines }}"
