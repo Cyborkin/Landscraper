@@ -53,16 +53,19 @@ Key principle: agents select their tools based on source characteristics, not ha
 
 ## Key Directories
 
-- `src/landscraper/agents/` — LangGraph agent definitions and graph
-- `src/landscraper/models/` — SQLAlchemy models and Pydantic schemas
-- `src/landscraper/scraping/` — scraping tool implementations
-- `src/landscraper/api/` — FastAPI routes
+- `src/landscraper/agents/` — LangGraph agent definitions, graph, and node functions
+- `src/landscraper/models/` — SQLAlchemy models (9 tables)
+- `src/landscraper/scraping/` — 5 scraper types (Census BPS, SODA, SEC EDGAR, RSS, httpx)
+- `src/landscraper/pipeline/` — dedup, correlator, enricher, 100-point scorer
+- `src/landscraper/consensus/` — validators and confidence scoring
+- `src/landscraper/improvement/` — cycle metrics and strategy evaluation
+- `src/landscraper/api/` — FastAPI REST API with bearer auth
+- `src/landscraper/notifications/` — Slack, webhook, email delivery channels
 - `src/landscraper/llm/` — LLM routing (local vs cloud)
-- `src/landscraper/notifications/` — email, Slack, webhook delivery
 - `docs/research/` — Phase 0 research (data sources, lead format)
 - `docs/plans/` — implementation plans
 - `ansible/` — Ansible playbooks for Swarm deployment
-- `docker/` — Dockerfile, docker-bake.hcl, dev compose
+- `docker/` — Dockerfile, docker-bake.hcl, dev/prod compose
 
 ## Conventions
 
