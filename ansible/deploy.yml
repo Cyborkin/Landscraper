@@ -1,0 +1,54 @@
+---
+- name: Deploy Landscraper to Docker Swarm
+  hosts: swarm_manager
+  tasks:
+    - name: Pull latest image
+      community.docker.docker_image:
+        name: "{{ registry }}/landscraper:{{ landscraper_tag }}"
+        source: pull
+        force_source: true
+
+    - name: Deploy stack
+      community.docker.docker_stack:
+        name: landscraper
+        compose:
+          - version: "3.8"
+            services:
+              api:
+                image: "{{ registry }}/landscraper:{{ landscraper_tag }}"
+                environment:
+                  LANDSCRAPER_DATABASE_URL: "{{ db_url }}"
+                  LANDSCRAPER_REDIS_URL: "{{ redis_url }}"
+                networks:
+                  - default
+                  - redis_net
+                ports:
+                  - "8000:8000"
+                deploy:
+                  replicas: 1
+                  restart_policy:
+                    condition: on-failure
+                    delay: 5s
+                    max_attempts: 3
+
+              postgres:
+                image: postgres:16-alpine
+                environment:
+                  POSTGRES_USER: landscraper
+                  POSTGRES_PASSWORD: landscraper
+                  POSTGRES_DB: landscraper
+                volumes:
+                  - pgdata:/var/lib/postgresql/data
+                deploy:
+                  placement:
+                    constraints:
+                      - node.role == manager
+
+            networks:
+              redis_net:
+                external: true
+                name: "{{ redis_network }}"
+
+            volumes:
+              pgdata:
+        state: present

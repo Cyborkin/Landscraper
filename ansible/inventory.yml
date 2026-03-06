@@ -1,0 +1,12 @@
+all:
+  hosts:
+    swarm_manager:
+      ansible_host: 192.168.0.12
+      ansible_user: swarm
+      ansible_password: swarm
+  vars:
+    registry: "192.168.0.12:5000"
+    landscraper_tag: "latest"
+    redis_url: "redis://redis:6379/1"
+    db_url: "postgresql+asyncpg://landscraper:landscraper@postgres:5432/landscraper"
+    redis_network: "iranwatch_default"
