@@ -1,7 +1,8 @@
 [build]
 dockerfilePath = "docker/Dockerfile"
+buildArgs = { INSTALL_PLAYWRIGHT = "false" }
 
 [deploy]
 healthcheckPath = "/health"
-healthcheckTimeout = 10
+healthcheckTimeout = 60
 restartPolicyType = "ON_FAILURE"

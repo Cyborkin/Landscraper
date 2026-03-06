@@ -7,7 +7,7 @@ COPY dashboard/ ./
 RUN npm run build
 
 # Stage 2: Python app
-FROM python:3.14-slim AS base
+FROM python:3.12-slim AS base
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -20,14 +20,17 @@ COPY alembic/ alembic/
 COPY alembic.ini .
 
 RUN pip install --no-cache-dir .
-RUN playwright install --with-deps chromium
+
+# Install Playwright only if not on Railway (saves ~400MB)
+ARG INSTALL_PLAYWRIGHT=true
+RUN if [ "$INSTALL_PLAYWRIGHT" = "true" ]; then playwright install --with-deps chromium; fi
 
 # Copy dashboard build
 COPY --from=frontend /app/dashboard/dist dashboard/dist
 
-EXPOSE 8000
+EXPOSE ${PORT:-8000}
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD curl -f http://localhost:8000/health || exit 1
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+    CMD curl -f http://localhost:${PORT:-8000}/health || exit 1
 
 CMD ["sh", "-c", "alembic upgrade head && uvicorn landscraper.api.main:app --host 0.0.0.0 --port ${PORT:-8000}"]

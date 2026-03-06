@@ -16,6 +16,12 @@ if config.config_file_name is not None:
 
 # Allow env var to override alembic.ini URL (needed for Docker deployments)
 db_url = os.environ.get("LANDSCRAPER_DATABASE_URL")
+if not db_url:
+    # Bridge Railway's DATABASE_URL (convert scheme for asyncpg)
+    raw = os.environ.get("DATABASE_URL", "")
+    if raw:
+        db_url = raw.replace("postgres://", "postgresql+asyncpg://", 1)
+        db_url = db_url.replace("postgresql://", "postgresql+asyncpg://", 1)
 if db_url:
     config.set_main_option("sqlalchemy.url", db_url)
 
