@@ -65,7 +65,26 @@ Key principle: agents select their tools based on source characteristics, not ha
 - `docs/research/` — Phase 0 research (data sources, lead format)
 - `docs/plans/` — implementation plans
 - `ansible/` — Ansible playbooks for Swarm deployment
-- `docker/` — Dockerfile, docker-bake.hcl, dev/prod compose
+- `dashboard/` — Vite + React SPA (TypeScript, Tailwind v4, shadcn/ui, Tremor, Leaflet, React Flow)
+- `docker/` — Dockerfile (multi-stage: Node + Python), docker-bake.hcl, dev/prod compose
+
+## Dashboard
+
+Executive demo dashboard served by FastAPI at `/dashboard`. Built with Vite + React + TypeScript.
+
+```bash
+# Dev (with hot reload, proxies to FastAPI)
+cd dashboard && npm run dev
+
+# Build for production
+cd dashboard && npm run build   # → dashboard/dist/
+
+# FastAPI auto-serves dashboard/dist/ via StaticFiles
+uvicorn landscraper.api.main:app --reload
+# Visit http://localhost:8000/dashboard
+```
+
+Four views: KPI Dashboard, Lead Explorer (table + Leaflet map), Lead Detail (radar chart), Pipeline Monitor (React Flow).
 
 ## Tracing (LangSmith)
 
