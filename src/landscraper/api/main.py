@@ -25,7 +25,7 @@ from landscraper.api.schemas import (
 )
 from landscraper.api.tenant_registry import register_default_tenant
 from landscraper.db import async_session
-from landscraper.db.crud import get_lead_by_id
+from landscraper.db.crud import ensure_poc_tenant, get_lead_by_id
 from landscraper.db.crud import list_leads as db_list_leads
 from landscraper.models.development import Development
 from landscraper.models.lead import Lead
@@ -96,9 +96,8 @@ async def list_leads(
     page_size: int = Query(50, ge=1, le=200, description="Results per page"),
 ):
     """List development leads with optional filters."""
-    tenant_id = app.state.poc_tenant_id
-
     async with async_session() as session:
+        tenant_id = await ensure_poc_tenant(session)
         items, total = await db_list_leads(
             session,
             tenant_id,
@@ -109,8 +108,7 @@ async def list_leads(
             page=page,
             page_size=page_size,
         )
-
-    leads_out = [_dev_to_lead_out(dev, lead) for dev, lead in items]
+        leads_out = [_dev_to_lead_out(dev, lead) for dev, lead in items]
 
     end = page * page_size
     next_url = None
@@ -136,16 +134,13 @@ async def get_lead(
     tenant: Annotated[dict, Depends(verify_api_key)],
 ):
     """Get a single lead by ID."""
-    tenant_id = app.state.poc_tenant_id
-
     async with async_session() as session:
+        tenant_id = await ensure_poc_tenant(session)
         result = await get_lead_by_id(session, uuid.UUID(lead_id), tenant_id)
-
-    if result is None:
-        raise HTTPException(status_code=404, detail="Lead not found")
-
-    dev, lead = result
-    return _dev_to_lead_out(dev, lead)
+        if result is None:
+            raise HTTPException(status_code=404, detail="Lead not found")
+        dev, lead = result
+        return _dev_to_lead_out(dev, lead)
 
 
 @app.get("/api/v1/cycle/status", response_model=CycleStatusResponse)

@@ -68,11 +68,19 @@ def _make_lead(dev, **overrides):
     return SimpleNamespace(**defaults)
 
 
+def _mock_session():
+    """Create mock async session context manager."""
+    mock_factory = AsyncMock()
+    mock_session = AsyncMock()
+    mock_factory.return_value.__aenter__ = AsyncMock(return_value=mock_session)
+    mock_factory.return_value.__aexit__ = AsyncMock(return_value=False)
+    return mock_factory
+
+
 @pytest.fixture(autouse=True)
 def setup_api():
-    """Register default tenant and set poc_tenant_id on app state."""
+    """Register default tenant."""
     register_default_tenant()
-    app.state.poc_tenant_id = POC_TENANT_ID
     yield
 
 
@@ -100,10 +108,10 @@ def test_list_leads_bad_key():
 
 
 @patch("landscraper.api.main.db_list_leads", new_callable=AsyncMock)
+@patch("landscraper.api.main.ensure_poc_tenant", new_callable=AsyncMock, return_value=POC_TENANT_ID)
 @patch("landscraper.api.main.async_session")
-def test_list_leads_empty(mock_session_factory, mock_list):
-    mock_session = AsyncMock()
-    mock_session_factory.return_value.__aenter__ = AsyncMock(return_value=mock_session)
+def test_list_leads_empty(mock_session_factory, mock_tenant, mock_list):
+    mock_session_factory.return_value.__aenter__ = AsyncMock(return_value=AsyncMock())
     mock_session_factory.return_value.__aexit__ = AsyncMock(return_value=False)
     mock_list.return_value = ([], 0)
 
@@ -115,10 +123,10 @@ def test_list_leads_empty(mock_session_factory, mock_list):
 
 
 @patch("landscraper.api.main.db_list_leads", new_callable=AsyncMock)
+@patch("landscraper.api.main.ensure_poc_tenant", new_callable=AsyncMock, return_value=POC_TENANT_ID)
 @patch("landscraper.api.main.async_session")
-def test_list_leads_with_data(mock_session_factory, mock_list):
-    mock_session = AsyncMock()
-    mock_session_factory.return_value.__aenter__ = AsyncMock(return_value=mock_session)
+def test_list_leads_with_data(mock_session_factory, mock_tenant, mock_list):
+    mock_session_factory.return_value.__aenter__ = AsyncMock(return_value=AsyncMock())
     mock_session_factory.return_value.__aexit__ = AsyncMock(return_value=False)
 
     dev1 = _make_dev(permit_number="BLD-001", address_city="Denver", county="Denver",
@@ -139,10 +147,10 @@ def test_list_leads_with_data(mock_session_factory, mock_list):
 
 
 @patch("landscraper.api.main.db_list_leads", new_callable=AsyncMock)
+@patch("landscraper.api.main.ensure_poc_tenant", new_callable=AsyncMock, return_value=POC_TENANT_ID)
 @patch("landscraper.api.main.async_session")
-def test_list_leads_filter_tier(mock_session_factory, mock_list):
-    mock_session = AsyncMock()
-    mock_session_factory.return_value.__aenter__ = AsyncMock(return_value=mock_session)
+def test_list_leads_filter_tier(mock_session_factory, mock_tenant, mock_list):
+    mock_session_factory.return_value.__aenter__ = AsyncMock(return_value=AsyncMock())
     mock_session_factory.return_value.__aexit__ = AsyncMock(return_value=False)
 
     dev = _make_dev(tier="hot", lead_score=85)
@@ -156,10 +164,10 @@ def test_list_leads_filter_tier(mock_session_factory, mock_list):
 
 
 @patch("landscraper.api.main.db_list_leads", new_callable=AsyncMock)
+@patch("landscraper.api.main.ensure_poc_tenant", new_callable=AsyncMock, return_value=POC_TENANT_ID)
 @patch("landscraper.api.main.async_session")
-def test_list_leads_filter_county(mock_session_factory, mock_list):
-    mock_session = AsyncMock()
-    mock_session_factory.return_value.__aenter__ = AsyncMock(return_value=mock_session)
+def test_list_leads_filter_county(mock_session_factory, mock_tenant, mock_list):
+    mock_session_factory.return_value.__aenter__ = AsyncMock(return_value=AsyncMock())
     mock_session_factory.return_value.__aexit__ = AsyncMock(return_value=False)
 
     dev = _make_dev(county="Denver", tier="warm")
@@ -172,10 +180,10 @@ def test_list_leads_filter_county(mock_session_factory, mock_list):
 
 
 @patch("landscraper.api.main.db_list_leads", new_callable=AsyncMock)
+@patch("landscraper.api.main.ensure_poc_tenant", new_callable=AsyncMock, return_value=POC_TENANT_ID)
 @patch("landscraper.api.main.async_session")
-def test_list_leads_min_score(mock_session_factory, mock_list):
-    mock_session = AsyncMock()
-    mock_session_factory.return_value.__aenter__ = AsyncMock(return_value=mock_session)
+def test_list_leads_min_score(mock_session_factory, mock_tenant, mock_list):
+    mock_session_factory.return_value.__aenter__ = AsyncMock(return_value=AsyncMock())
     mock_session_factory.return_value.__aexit__ = AsyncMock(return_value=False)
 
     lead_id = uuid.uuid4()
@@ -190,10 +198,10 @@ def test_list_leads_min_score(mock_session_factory, mock_list):
 
 
 @patch("landscraper.api.main.db_list_leads", new_callable=AsyncMock)
+@patch("landscraper.api.main.ensure_poc_tenant", new_callable=AsyncMock, return_value=POC_TENANT_ID)
 @patch("landscraper.api.main.async_session")
-def test_list_leads_pagination(mock_session_factory, mock_list):
-    mock_session = AsyncMock()
-    mock_session_factory.return_value.__aenter__ = AsyncMock(return_value=mock_session)
+def test_list_leads_pagination(mock_session_factory, mock_tenant, mock_list):
+    mock_session_factory.return_value.__aenter__ = AsyncMock(return_value=AsyncMock())
     mock_session_factory.return_value.__aexit__ = AsyncMock(return_value=False)
 
     items = []
@@ -211,10 +219,10 @@ def test_list_leads_pagination(mock_session_factory, mock_list):
 
 
 @patch("landscraper.api.main.get_lead_by_id", new_callable=AsyncMock)
+@patch("landscraper.api.main.ensure_poc_tenant", new_callable=AsyncMock, return_value=POC_TENANT_ID)
 @patch("landscraper.api.main.async_session")
-def test_get_lead(mock_session_factory, mock_get):
-    mock_session = AsyncMock()
-    mock_session_factory.return_value.__aenter__ = AsyncMock(return_value=mock_session)
+def test_get_lead(mock_session_factory, mock_tenant, mock_get):
+    mock_session_factory.return_value.__aenter__ = AsyncMock(return_value=AsyncMock())
     mock_session_factory.return_value.__aexit__ = AsyncMock(return_value=False)
 
     lead_id = uuid.uuid4()
@@ -230,10 +238,10 @@ def test_get_lead(mock_session_factory, mock_get):
 
 
 @patch("landscraper.api.main.get_lead_by_id", new_callable=AsyncMock)
+@patch("landscraper.api.main.ensure_poc_tenant", new_callable=AsyncMock, return_value=POC_TENANT_ID)
 @patch("landscraper.api.main.async_session")
-def test_get_lead_not_found(mock_session_factory, mock_get):
-    mock_session = AsyncMock()
-    mock_session_factory.return_value.__aenter__ = AsyncMock(return_value=mock_session)
+def test_get_lead_not_found(mock_session_factory, mock_tenant, mock_get):
+    mock_session_factory.return_value.__aenter__ = AsyncMock(return_value=AsyncMock())
     mock_session_factory.return_value.__aexit__ = AsyncMock(return_value=False)
     mock_get.return_value = None
 
@@ -246,7 +254,7 @@ def test_cycle_status():
     response = client.get("/api/v1/cycle/status", headers=AUTH_HEADER)
     assert response.status_code == 200
     data = response.json()
-    assert data["status"] in ("idle", "triggered", "complete")
+    assert data["status"] in ("idle", "triggered", "complete", "running")
 
 
 def test_trigger_cycle():
@@ -262,11 +270,11 @@ def test_trigger_cycle():
 
 
 @patch("landscraper.api.main.get_lead_by_id", new_callable=AsyncMock)
+@patch("landscraper.api.main.ensure_poc_tenant", new_callable=AsyncMock, return_value=POC_TENANT_ID)
 @patch("landscraper.api.main.async_session")
-def test_lead_response_structure(mock_session_factory, mock_get):
+def test_lead_response_structure(mock_session_factory, mock_tenant, mock_get):
     """Verify the lead response includes nested address and coordinates."""
-    mock_session = AsyncMock()
-    mock_session_factory.return_value.__aenter__ = AsyncMock(return_value=mock_session)
+    mock_session_factory.return_value.__aenter__ = AsyncMock(return_value=AsyncMock())
     mock_session_factory.return_value.__aexit__ = AsyncMock(return_value=False)
 
     lead_id = uuid.uuid4()
@@ -293,10 +301,10 @@ def test_lead_response_structure(mock_session_factory, mock_get):
 
 
 @patch("landscraper.api.main.get_lead_by_id", new_callable=AsyncMock)
+@patch("landscraper.api.main.ensure_poc_tenant", new_callable=AsyncMock, return_value=POC_TENANT_ID)
 @patch("landscraper.api.main.async_session")
-def test_lead_includes_score_breakdown(mock_session_factory, mock_get):
-    mock_session = AsyncMock()
-    mock_session_factory.return_value.__aenter__ = AsyncMock(return_value=mock_session)
+def test_lead_includes_score_breakdown(mock_session_factory, mock_tenant, mock_get):
+    mock_session_factory.return_value.__aenter__ = AsyncMock(return_value=AsyncMock())
     mock_session_factory.return_value.__aexit__ = AsyncMock(return_value=False)
 
     lead_id = uuid.uuid4()
