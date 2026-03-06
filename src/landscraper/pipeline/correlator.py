@@ -10,6 +10,8 @@ import re
 from collections import defaultdict
 from typing import Any
 
+from langsmith import traceable
+
 
 def _normalize_address(address: str) -> str:
     """Normalize address for fuzzy matching."""
@@ -66,6 +68,7 @@ def _extract_correlation_key(record: dict[str, Any]) -> str | None:
     return None
 
 
+@traceable(run_type="tool", name="CorrelateRecords")
 def correlate_records(records: list[dict[str, Any]]) -> dict[str, list[dict[str, Any]]]:
     """Group raw records into correlation clusters.
 

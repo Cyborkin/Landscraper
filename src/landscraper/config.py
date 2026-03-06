@@ -16,6 +16,11 @@ class Settings(BaseSettings):
     default_cloud_model: str = "claude-sonnet-4-20250514"
     default_local_model: str = "mistral"
 
+    # LangSmith
+    langsmith_api_key: str = ""
+    langsmith_project: str = "landscraper"
+    langsmith_tracing_enabled: bool = True
+
     # Scraping
     scrape_rate_limit_seconds: float = 2.0
     playwright_headless: bool = True

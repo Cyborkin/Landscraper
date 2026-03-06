@@ -182,3 +182,11 @@ def test_lead_response_structure():
     assert data["address"]["city"] == "Denver"
     assert data["address"]["county"] == "Denver"
     assert data["coordinates"]["latitude"] == 39.7392
+
+
+def test_tracing_status():
+    response = client.get("/api/v1/tracing/status", headers=AUTH_HEADER)
+    assert response.status_code == 200
+    data = response.json()
+    assert "enabled" in data
+    assert isinstance(data["enabled"], bool)

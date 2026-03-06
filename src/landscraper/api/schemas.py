@@ -80,3 +80,8 @@ class CycleStatusResponse(BaseModel):
 
 class TriggerCycleRequest(BaseModel):
     sources: list[dict[str, Any]] | None = None
+
+
+class TracingStatusResponse(BaseModel):
+    enabled: bool
+    project: str | None = None

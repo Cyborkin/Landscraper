@@ -1,3 +1,5 @@
+import os
+
 import pytest
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -10,6 +12,15 @@ TEST_DATABASE_URL = (
 ADMIN_DATABASE_URL = (
     "postgresql+asyncpg://landscraper:landscraper@localhost:5432/landscraper"
 )
+
+
+@pytest.fixture(autouse=True, scope="session")
+def disable_langsmith_tracing():
+    """Ensure LangSmith tracing is disabled during tests."""
+    os.environ.pop("LANGCHAIN_TRACING_V2", None)
+    os.environ.pop("LANGCHAIN_API_KEY", None)
+    os.environ.pop("LANGCHAIN_PROJECT", None)
+    yield
 
 
 @pytest.fixture(scope="session", autouse=True)

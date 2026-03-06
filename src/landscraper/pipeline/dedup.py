@@ -2,7 +2,10 @@
 
 from typing import Any
 
+from langsmith import traceable
 
+
+@traceable(run_type="tool", name="Deduplicate")
 def deduplicate(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Remove duplicate raw records based on content_hash.
 

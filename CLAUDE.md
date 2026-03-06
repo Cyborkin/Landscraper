@@ -67,6 +67,13 @@ Key principle: agents select their tools based on source characteristics, not ha
 - `ansible/` — Ansible playbooks for Swarm deployment
 - `docker/` — Dockerfile, docker-bake.hcl, dev/prod compose
 
+## Tracing (LangSmith)
+
+LangSmith observability is integrated. Set `LANDSCRAPER_LANGSMITH_API_KEY` in `.env` to enable.
+Pipeline functions (dedup, correlator, enricher, scorer, confidence) use `@traceable` decorators.
+LangGraph nodes and Send() delegations are traced automatically.
+View traces at https://smith.langchain.com (project: `landscraper`).
+
 ## Conventions
 
 - All config via environment variables with `LANDSCRAPER_` prefix (see `.env.example`)

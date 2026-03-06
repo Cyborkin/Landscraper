@@ -1,5 +1,7 @@
 """FastAPI application entry point."""
 
+import logging
+import os
 import uuid
 from contextlib import asynccontextmanager
 from typing import Annotated, Any
@@ -15,9 +17,12 @@ from landscraper.api.schemas import (
     LeadListResponse,
     LeadOut,
     PaginationMeta,
+    TracingStatusResponse,
     TriggerCycleRequest,
 )
 from landscraper.api.tenant_registry import register_default_tenant
+
+logger = logging.getLogger(__name__)
 
 # In-memory lead store for POC (production: database)
 _leads_store: list[dict[str, Any]] = []
@@ -26,7 +31,15 @@ _last_cycle: dict[str, Any] = {"cycle_id": None, "status": "idle", "metrics": {}
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    from landscraper.tracing import configure_tracing
+
     register_default_tenant()
+    tracing = configure_tracing()
+    if tracing:
+        logger.info(
+            "LangSmith tracing enabled (project: %s)",
+            os.environ.get("LANGCHAIN_PROJECT", "default"),
+        )
     yield
 
 
@@ -118,14 +131,30 @@ async def trigger_cycle(
     tenant: Annotated[dict, Depends(verify_api_key)],
 ):
     """Trigger a new data collection cycle."""
+    from landscraper.tracing import cycle_run_config
+
     cycle_id = str(uuid.uuid4())
+    run_config = cycle_run_config(cycle_id)  # noqa: F841 — used when graph invocation is wired
     _last_cycle.update({
         "cycle_id": cycle_id,
         "status": "triggered",
         "metrics": {},
     })
-    # TODO: actually run the graph asynchronously
+    # TODO: invoke graph with: await compiled_graph.ainvoke(state, config=run_config)
     return CycleStatusResponse(**_last_cycle)
+
+
+@app.get("/api/v1/tracing/status", response_model=TracingStatusResponse)
+async def tracing_status(
+    tenant: Annotated[dict, Depends(verify_api_key)],
+):
+    """Check if LangSmith tracing is active."""
+    from landscraper.tracing import tracing_is_enabled
+
+    return TracingStatusResponse(
+        enabled=tracing_is_enabled(),
+        project=os.environ.get("LANGCHAIN_PROJECT"),
+    )
 
 
 def store_leads(leads: list[dict[str, Any]]) -> None:

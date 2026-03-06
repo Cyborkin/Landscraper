@@ -6,6 +6,8 @@ and produces a single enriched development dict.
 
 from typing import Any
 
+from langsmith import traceable
+
 
 def _merge_field(records: list[dict[str, Any]], field: str) -> Any:
     """Extract the best value for a field across multiple records.
@@ -32,6 +34,7 @@ def _collect_sources(records: list[dict[str, Any]]) -> list[str]:
     return sources
 
 
+@traceable(run_type="tool", name="EnrichDevelopment")
 def enrich_development(
     correlation_key: str,
     records: list[dict[str, Any]],

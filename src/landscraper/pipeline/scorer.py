@@ -6,11 +6,14 @@ Implements the 10-factor scoring model from docs/research/lead_format.md.
 from datetime import datetime, timezone
 from typing import Any
 
+from langsmith import traceable
+
 # High-growth corridors along the Front Range
 HIGH_GROWTH_COUNTIES = {"Adams", "Broomfield", "Weld", "Douglas", "Larimer"}
 MODERATE_GROWTH_COUNTIES = {"Arapahoe", "Jefferson", "El Paso", "Denver", "Boulder"}
 
 
+@traceable(run_type="tool", name="ScoreDevelopment")
 def score_development(dev: dict[str, Any]) -> dict[str, Any]:
     """Apply the 100-point scoring model to a development record.
 

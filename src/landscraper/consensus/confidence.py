@@ -9,6 +9,8 @@ Computes a 0.0-1.0 confidence score based on data quality signals:
 
 from typing import Any
 
+from langsmith import traceable
+
 # Source reliability weights (higher = more trustworthy)
 SOURCE_RELIABILITY = {
     "census_bps": 0.95,
@@ -43,6 +45,7 @@ COMPLETENESS_FIELDS = [
 ]
 
 
+@traceable(run_type="tool", name="ComputeConfidence")
 def compute_confidence(dev: dict[str, Any]) -> float:
     """Compute a confidence score (0.0-1.0) for a development record.
 
