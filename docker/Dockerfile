@@ -1,7 +1,7 @@
 # Stage 1: Build dashboard
 FROM node:20-slim AS frontend
 WORKDIR /app/dashboard
-COPY dashboard/package*.json ./
+COPY dashboard/package*.json dashboard/.npmrc ./
 RUN npm ci
 COPY dashboard/ ./
 RUN npm run build
