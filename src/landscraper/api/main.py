@@ -43,6 +43,16 @@ async def lifespan(app: FastAPI):
             "LangSmith tracing enabled (project: %s)",
             os.environ.get("LANGCHAIN_PROJECT", "default"),
         )
+
+    # Ensure POC tenant exists in database
+    from landscraper.db import async_session
+    from landscraper.db.crud import ensure_poc_tenant
+
+    async with async_session() as session:
+        tenant_id = await ensure_poc_tenant(session)
+        app.state.poc_tenant_id = tenant_id
+        logger.info("POC tenant ensured in DB: %s", tenant_id)
+
     yield
 
 
@@ -55,7 +65,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=["http://localhost:3000", "http://192.168.0.25:8000", "http://localhost:8000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -144,6 +154,12 @@ async def cycle_status(
 DEFAULT_SOURCES = [
     {"name": "colorado_soda_permits", "access_method": "api"},
     {"name": "census_bps", "access_method": "api"},
+    {"name": "dola_demography", "access_method": "api"},
+    {"name": "sec_edgar", "access_method": "api"},
+    {"name": "fort_collins_permits", "access_method": "api"},
+    {"name": "aurora_permits", "access_method": "api"},
+    {"name": "denver_residential_permits", "access_method": "api"},
+    {"name": "denver_rezoning", "access_method": "api"},
     {
         "name": "bizwest_rss",
         "access_method": "rss",
@@ -151,16 +167,16 @@ DEFAULT_SOURCES = [
         "keywords": ["permit", "development", "construction", "residential", "commercial"],
     },
     {
-        "name": "colorado_real_estate_journal_rss",
+        "name": "denver_post_real_estate_rss",
         "access_method": "rss",
-        "url": "https://crej.com/feed/",
-        "keywords": ["permit", "development", "construction", "residential", "commercial", "mixed-use"],
+        "url": "https://www.denverpost.com/tag/real-estate/feed/",
+        "keywords": ["development", "construction", "permit", "residential", "building", "housing"],
     },
     {
-        "name": "denver_business_journal_rss",
+        "name": "denverinfill_rss",
         "access_method": "rss",
-        "url": "https://www.bizjournals.com/denver/news/rss.xml",
-        "keywords": ["development", "construction", "permit", "residential", "building"],
+        "url": "https://denverinfill.com/feed",
+        "keywords": ["development", "construction", "residential", "project", "proposed", "approved"],
     },
 ]
 
