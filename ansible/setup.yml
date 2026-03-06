@@ -17,9 +17,8 @@
           - curl
           - gnupg
           - lsb-release
-          - software-properties-common
           - pciutils
-          - linux-headers-{{ ansible_kernel }}
+          - "linux-headers-{{ ansible_facts['kernel'] }}"
         state: present
 
     # ── NVIDIA GPU drivers (Debian) ────────────────────────────────

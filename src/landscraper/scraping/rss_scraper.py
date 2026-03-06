@@ -42,9 +42,11 @@ class RSSFeedScraper(BaseScraper):
 
             raw = {
                 "title": title,
+                "description": f"{title}. {summary}" if summary else title,
                 "summary": summary,
                 "link": link,
                 "published": published,
+                "filing_date": published,
                 "source_feed": self.feed_url,
             }
 
