@@ -20,12 +20,15 @@ logger = logging.getLogger(__name__)
 def _build_scraper(source: dict[str, Any]):
     """Instantiate the right scraper based on source config."""
     from landscraper.scraping import (
+        ArcGISScraper,
         CensusBPSScraper,
+        DOLAScraper,
         HttpxScraper,
         RSSFeedScraper,
         SECEdgarScraper,
         SodaScraper,
     )
+    from landscraper.scraping.arcgis_scraper import ARCGIS_SOURCES
 
     access_method = source.get("access_method", "")
     source_name = source.get("name", "unknown")
@@ -36,6 +39,10 @@ def _build_scraper(source: dict[str, Any]):
         return SodaScraper()
     elif source_name == "sec_edgar":
         return SECEdgarScraper()
+    elif source_name == "dola_demography":
+        return DOLAScraper()
+    elif source_name in ARCGIS_SOURCES:
+        return ArcGISScraper(source_name)
     elif access_method == "rss":
         return RSSFeedScraper(
             source_name=source_name,
@@ -384,7 +391,9 @@ async def delivery_node(state: LandscraperState) -> dict[str, Any]:
 
     Uses Haiku to generate concise lead summaries for notifications.
     """
-    from landscraper.api.main import store_leads, update_cycle_status
+    from landscraper.api.main import update_cycle_status
+    from landscraper.db import async_session
+    from landscraper.db.crud import ensure_poc_tenant, store_validated_leads
 
     from .llm import get_llm
 
@@ -416,7 +425,12 @@ async def delivery_node(state: LandscraperState) -> dict[str, Any]:
             except Exception as e:
                 logger.debug("Lead summary generation failed: %s", e)
 
-        store_leads(validated)
+        # Persist to database
+        async with async_session() as session:
+            tenant_id = await ensure_poc_tenant(session)
+            count = await store_validated_leads(session, validated, tenant_id)
+            logger.info("Persisted %d leads to DB for cycle %s", count, cycle_id)
+
         logger.info("Delivered %d leads for cycle %s", len(validated), cycle_id)
 
     update_cycle_status(
