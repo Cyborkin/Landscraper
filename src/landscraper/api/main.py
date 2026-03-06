@@ -69,9 +69,19 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+_cors_origins = [
+    "http://localhost:3000",
+    "http://localhost:8000",
+    "http://192.168.0.25:8000",
+]
+# Allow Railway domain via env var (e.g. https://landscraper-production.up.railway.app)
+_extra_origin = os.environ.get("LANDSCRAPER_CORS_ORIGIN")
+if _extra_origin:
+    _cors_origins.append(_extra_origin)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://192.168.0.25:8000", "http://localhost:8000"],
+    allow_origins=_cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

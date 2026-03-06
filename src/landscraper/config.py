@@ -61,6 +61,18 @@ class Settings(BaseSettings):
             if port:
                 values["api_port"] = int(port)
 
+        # ANTHROPIC_API_KEY (standard name used by Anthropic SDK)
+        if not values.get("anthropic_api_key") and not os.environ.get("LANDSCRAPER_ANTHROPIC_API_KEY"):
+            raw = os.environ.get("ANTHROPIC_API_KEY", "")
+            if raw:
+                values["anthropic_api_key"] = raw
+
+        # LANGSMITH_API_KEY
+        if not values.get("langsmith_api_key") and not os.environ.get("LANDSCRAPER_LANGSMITH_API_KEY"):
+            raw = os.environ.get("LANGSMITH_API_KEY", "")
+            if raw:
+                values["langsmith_api_key"] = raw
+
         return values
 
 

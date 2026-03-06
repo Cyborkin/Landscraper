@@ -1,0 +1,16 @@
+.venv
+.git
+__pycache__
+*.pyc
+node_modules
+dashboard/dist
+.env
+.env.*
+*.tar.gz
+.mypy_cache
+.pytest_cache
+.ruff_cache
+docs/
+tests/
+ansible/
+*.md
