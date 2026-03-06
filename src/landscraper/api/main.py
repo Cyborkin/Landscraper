@@ -190,10 +190,12 @@ def update_cycle_status(cycle_id: str, status: str, metrics: dict | None = None)
 
 
 # Serve dashboard SPA if build exists
-_dashboard_dir = os.path.join(
-    os.path.dirname(__file__), "..", "..", "..", "dashboard", "dist"
-)
-if os.path.isdir(_dashboard_dir):
+_dashboard_candidates = [
+    os.path.join(os.path.dirname(__file__), "..", "..", "..", "dashboard", "dist"),  # dev (source tree)
+    os.path.join(os.getcwd(), "dashboard", "dist"),  # container (WORKDIR /app)
+]
+_dashboard_dir = next((d for d in _dashboard_candidates if os.path.isdir(d)), None)
+if _dashboard_dir:
     from fastapi.staticfiles import StaticFiles
 
     app.mount("/dashboard", StaticFiles(directory=_dashboard_dir, html=True), name="dashboard")
