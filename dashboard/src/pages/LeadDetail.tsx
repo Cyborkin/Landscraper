@@ -93,10 +93,10 @@ export default function LeadDetail() {
           <Card title="Scoring Breakdown">
             <ResponsiveContainer width="100%" height={300}>
               <RadarChart data={radarData}>
-                <PolarGrid stroke="#D1D5DB" />
-                <PolarAngleAxis dataKey="factor" tick={{ fill: "#4B5563", fontSize: 11 }} />
+                <PolarGrid stroke="#CBD5E1" />
+                <PolarAngleAxis dataKey="factor" tick={{ fill: "#475569", fontSize: 11 }} />
                 <PolarRadiusAxis angle={90} domain={[0, "dataMax"]} tick={false} axisLine={false} />
-                <Radar name="Score" dataKey="score" stroke="#4F7C59" fill="#4F7C59" fillOpacity={0.2} strokeWidth={2} />
+                <Radar name="Score" dataKey="score" stroke="#0D9488" fill="#0D9488" fillOpacity={0.25} strokeWidth={2} />
               </RadarChart>
             </ResponsiveContainer>
           </Card>
@@ -107,11 +107,22 @@ export default function LeadDetail() {
               <span className="text-sm text-text-secondary">sources</span>
             </div>
             <div className="mt-2 flex flex-wrap gap-1.5">
-              {lead.sources.map((src) => (
-                <span key={src} className="rounded-md border border-border bg-surface-raised px-2 py-0.5 text-xs text-text-secondary">
-                  {src}
-                </span>
-              ))}
+              {lead.sources.map((src, i) => {
+                const colors = [
+                  "bg-teal-100 text-teal-700 border-teal-200",
+                  "bg-violet-100 text-violet-700 border-violet-200",
+                  "bg-amber-100 text-amber-700 border-amber-200",
+                  "bg-sky-100 text-sky-700 border-sky-200",
+                  "bg-rose-100 text-rose-700 border-rose-200",
+                  "bg-emerald-100 text-emerald-700 border-emerald-200",
+                  "bg-indigo-100 text-indigo-700 border-indigo-200",
+                ];
+                return (
+                  <span key={src} className={`rounded-md border px-2 py-0.5 text-xs font-medium ${colors[i % colors.length]}`}>
+                    {src}
+                  </span>
+                );
+              })}
               {lead.sources.length === 0 && (
                 <span className="text-xs text-text-secondary">No source data</span>
               )}
@@ -198,7 +209,7 @@ export default function LeadDetail() {
 
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-xl border border-border bg-surface p-5 shadow-sm">
+    <div className="rounded-xl border border-border bg-gradient-to-br from-surface to-surface-raised p-5 shadow-sm">
       <h3 className="mb-3 text-sm font-medium text-text-secondary">{title}</h3>
       {children}
     </div>
@@ -210,7 +221,7 @@ function InfoGrid({ items }: { items: [string, string | null | undefined][] }) {
     <div className="grid grid-cols-2 gap-2">
       {items.map(([label, value]) => (
         <div key={label}>
-          <p className="text-xs text-text-secondary">{label}</p>
+          <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wide">{label}</p>
           <p className="text-sm text-text-primary">{value ?? "\u2014"}</p>
         </div>
       ))}
@@ -220,14 +231,15 @@ function InfoGrid({ items }: { items: [string, string | null | undefined][] }) {
 
 function ConfidenceMeter({ value }: { value: number }) {
   const pct = Math.round(value * 100);
-  const color = value >= 0.7 ? "bg-secondary" : value >= 0.4 ? "bg-warm" : "bg-error";
+  const color = value >= 0.7 ? "bg-emerald-500" : value >= 0.4 ? "bg-amber-500" : "bg-rose-500";
+  const textColor = value >= 0.7 ? "text-emerald-700" : value >= 0.4 ? "text-amber-700" : "text-rose-700";
   return (
     <div>
       <div className="flex justify-between text-xs">
         <span className="text-text-secondary">Confidence</span>
-        <span className="font-semibold data-mono text-text-primary">{pct}%</span>
+        <span className={`font-semibold data-mono ${textColor}`}>{pct}%</span>
       </div>
-      <div className="mt-1 h-2 overflow-hidden rounded-full bg-border">
+      <div className="mt-1 h-2.5 overflow-hidden rounded-full bg-slate-200">
         <div className={`h-full rounded-full ${color}`} style={{ width: `${pct}%` }} />
       </div>
     </div>

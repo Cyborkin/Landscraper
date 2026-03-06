@@ -67,7 +67,7 @@ export default function LeadExplorer() {
       <div className="overflow-hidden rounded-xl border border-border bg-surface shadow-sm">
         <table className="w-full text-left text-sm">
           <thead>
-            <tr className="border-b border-border text-xs uppercase text-text-secondary">
+            <tr className="border-b border-border bg-slate-50 text-xs uppercase text-text-secondary">
               <th className="px-4 py-3">Score</th>
               <th className="px-4 py-3">Tier</th>
               <th className="px-4 py-3">City</th>
@@ -89,11 +89,11 @@ export default function LeadExplorer() {
                 </td>
               </tr>
             ) : (
-              leads.map((lead) => (
+              leads.map((lead, i) => (
                 <tr
                   key={lead.lead_id}
                   onClick={() => navigate(`/dashboard/leads/${lead.lead_id}`)}
-                  className="cursor-pointer border-b border-border/50 transition-colors hover:bg-surface-raised"
+                  className={`cursor-pointer border-b border-border/50 transition-colors hover:bg-primary/5 ${i % 2 === 0 ? "bg-slate-50/50" : ""}`}
                 >
                   <td className="px-4 py-3 data-mono"><ScoreBar score={lead.lead_score} /></td>
                   <td className="px-4 py-3"><TierBadge tier={lead.tier} /></td>
@@ -116,13 +116,15 @@ export default function LeadExplorer() {
 
 function ScoreBar({ score }: { score: number }) {
   const color =
-    score >= 80 ? "bg-hot" : score >= 50 ? "bg-warm" : score >= 20 ? "bg-secondary" : "bg-cold";
+    score >= 80 ? "bg-rose-500" : score >= 50 ? "bg-amber-500" : score >= 20 ? "bg-teal-500" : "bg-slate-400";
+  const textColor =
+    score >= 80 ? "text-rose-700" : score >= 50 ? "text-amber-700" : score >= 20 ? "text-teal-700" : "text-slate-500";
   return (
     <div className="flex items-center gap-2">
-      <div className="h-1.5 w-16 overflow-hidden rounded-full bg-border">
+      <div className="h-2 w-16 overflow-hidden rounded-full bg-slate-200">
         <div className={`h-full rounded-full ${color}`} style={{ width: `${score}%` }} />
       </div>
-      <span className="text-xs font-semibold text-text-primary">{score}</span>
+      <span className={`text-xs font-semibold ${textColor}`}>{score}</span>
     </div>
   );
 }

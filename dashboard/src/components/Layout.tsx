@@ -79,12 +79,12 @@ export default function Layout() {
             <span
               className={`rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
                 cycleStatus === "idle"
-                  ? "bg-surface-raised text-text-secondary"
+                  ? "bg-slate-100 text-slate-500"
                   : cycleStatus === "triggered" || cycleStatus === "running"
-                    ? "bg-cta/10 text-cta"
+                    ? "bg-amber-100 text-amber-700"
                     : cycleStatus === "completed" || cycleStatus === "complete"
-                      ? "bg-secondary/10 text-secondary"
-                      : "bg-error/10 text-error"
+                      ? "bg-emerald-100 text-emerald-700"
+                      : "bg-rose-100 text-rose-700"
               }`}
             >
               {cycleStatus}

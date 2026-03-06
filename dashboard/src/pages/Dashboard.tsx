@@ -78,42 +78,42 @@ export default function Dashboard() {
       </div>
 
       <div className="grid grid-cols-3 gap-4">
-        <div className="rounded-xl border border-border bg-surface p-5 shadow-sm">
+        <div className="rounded-xl border border-border bg-gradient-to-br from-surface to-surface-raised p-5 shadow-sm">
           <h3 className="mb-3 text-sm font-medium text-text-secondary">Tier Distribution</h3>
           <DonutChart
             data={tierData}
             category="value"
             index="name"
-            colors={["red", "orange", "gray", "zinc"]}
+            colors={["rose", "amber", "sky", "slate"]}
             showLabel
             className="h-48"
           />
         </div>
 
-        <div className="rounded-xl border border-border bg-surface p-5 shadow-sm">
+        <div className="rounded-xl border border-border bg-gradient-to-br from-surface to-surface-raised p-5 shadow-sm">
           <h3 className="mb-3 text-sm font-medium text-text-secondary">Score Distribution</h3>
           <BarChart
             data={scoreBuckets}
             index="range"
             categories={["count"]}
-            colors={["emerald"]}
+            colors={["teal"]}
             showLegend={false}
             showGridLines={false}
             className="h-48"
           />
         </div>
 
-        <div className="rounded-xl border border-border bg-surface p-5 shadow-sm">
+        <div className="rounded-xl border border-border bg-gradient-to-br from-surface to-surface-raised p-5 shadow-sm">
           <h3 className="mb-3 text-sm font-medium text-text-secondary">Leads by County</h3>
-          <BarList data={countyData} color="emerald" className="mt-2" />
+          <BarList data={countyData} color="violet" className="mt-2" />
         </div>
       </div>
 
-      <div className="rounded-xl border border-border bg-surface p-5 shadow-sm">
+      <div className="rounded-xl border border-border bg-gradient-to-br from-surface to-surface-raised p-5 shadow-sm">
         <h3 className="mb-3 text-sm font-medium text-text-secondary">Recent Activity</h3>
-        <div className="space-y-1">
-          {recentLeads.map((lead) => (
-            <RecentLeadRow key={lead.lead_id} lead={lead} />
+        <div className="space-y-0.5">
+          {recentLeads.map((lead, i) => (
+            <RecentLeadRow key={lead.lead_id} lead={lead} even={i % 2 === 0} />
           ))}
           {recentLeads.length === 0 && (
             <p className="text-sm text-text-secondary">No leads discovered yet.</p>
@@ -124,9 +124,9 @@ export default function Dashboard() {
   );
 }
 
-function RecentLeadRow({ lead }: { lead: Lead }) {
+function RecentLeadRow({ lead, even }: { lead: Lead; even: boolean }) {
   return (
-    <div className="flex items-center justify-between rounded-lg px-3 py-2 hover:bg-surface-raised transition-colors">
+    <div className={`flex items-center justify-between rounded-lg px-3 py-2 transition-colors hover:bg-primary/5 ${even ? "bg-surface-raised/60" : ""}`}>
       <div className="flex items-center gap-3">
         <TierBadge tier={lead.tier} />
         <span className="text-sm text-text-primary">

@@ -64,10 +64,10 @@ function formatTimestamp(iso: string | null | undefined): string {
 
 function statusColor(status: string): string {
   switch (status) {
-    case "completed": case "complete": return "text-secondary";
-    case "running": case "triggered": case "in_progress": return "text-cta";
-    case "error": return "text-error";
-    default: return "text-text-secondary";
+    case "completed": case "complete": return "text-emerald-600";
+    case "running": case "triggered": case "in_progress": return "text-amber-600";
+    case "error": return "text-rose-600";
+    default: return "text-slate-400";
   }
 }
 
@@ -227,7 +227,7 @@ export default function Pipeline() {
 
       {/* Sidebar */}
       <div className="w-72 space-y-3 overflow-y-auto">
-        <div className="rounded-xl border border-border bg-surface p-5 shadow-sm">
+        <div className="rounded-xl border border-border bg-gradient-to-br from-surface to-surface-raised p-5 shadow-sm">
           <button
             onClick={() => triggerMutation.mutate()}
             disabled={
@@ -247,7 +247,7 @@ export default function Pipeline() {
           )}
         </div>
 
-        <div className="rounded-xl border border-border bg-surface p-5 shadow-sm">
+        <div className="rounded-xl border border-border bg-gradient-to-br from-surface to-surface-raised p-5 shadow-sm">
           <h3 className="mb-2 text-sm font-medium text-text-secondary">
             Cycle Status
           </h3>
@@ -255,12 +255,12 @@ export default function Pipeline() {
             <span
               className={`h-2.5 w-2.5 rounded-full ${
                 cycleStatus === "idle"
-                  ? "bg-cold"
+                  ? "bg-slate-400"
                   : cycleStatus === "triggered" || cycleStatus === "running"
-                    ? "bg-cta animate-pulse"
+                    ? "bg-amber-500 animate-pulse"
                     : cycleStatus === "completed" || cycleStatus === "complete"
-                      ? "bg-secondary"
-                      : "bg-error"
+                      ? "bg-emerald-500"
+                      : "bg-rose-500"
               }`}
             />
             <span className="text-sm font-semibold capitalize text-text-primary">
@@ -275,7 +275,7 @@ export default function Pipeline() {
         </div>
 
         {metrics && typeof metrics.total_validated_leads === "number" && (
-          <div className="rounded-xl border border-border bg-surface p-5 shadow-sm">
+          <div className="rounded-xl border border-border bg-gradient-to-br from-surface to-surface-raised p-5 shadow-sm">
             <h3 className="mb-3 text-sm font-medium text-text-secondary">
               Cycle Metrics
             </h3>
@@ -294,7 +294,7 @@ export default function Pipeline() {
         )}
 
         {/* Run History */}
-        <div className="rounded-xl border border-border bg-surface p-5 shadow-sm">
+        <div className="rounded-xl border border-border bg-gradient-to-br from-surface to-surface-raised p-5 shadow-sm">
           <h3 className="mb-3 text-sm font-medium text-text-secondary">
             Run History
           </h3>
@@ -302,16 +302,16 @@ export default function Pipeline() {
             <p className="text-xs text-text-secondary">No runs yet.</p>
           ) : (
             <div className="space-y-2">
-              {history.slice(0, 10).map((run) => (
-                <div key={run.cycle_id} className="flex items-center justify-between rounded-lg px-2 py-1.5 hover:bg-surface-raised transition-colors">
+              {history.slice(0, 10).map((run, i) => (
+                <div key={run.cycle_id} className={`flex items-center justify-between rounded-lg px-2 py-1.5 transition-colors hover:bg-primary/5 ${i % 2 === 0 ? "bg-surface-raised/60" : ""}`}>
                   <div className="flex items-center gap-2">
                     <span
                       className={`h-2 w-2 rounded-full ${
                         run.status === "completed" || run.status === "complete"
-                          ? "bg-secondary"
+                          ? "bg-emerald-500"
                           : run.status === "error"
-                            ? "bg-error"
-                            : "bg-cta"
+                            ? "bg-rose-500"
+                            : "bg-amber-500"
                       }`}
                     />
                     <span className="text-[10px] font-mono text-text-secondary">
