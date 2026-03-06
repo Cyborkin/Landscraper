@@ -59,8 +59,16 @@ interface LeadMapProps {
   onSelect?: (leadId: string) => void;
 }
 
+function isValidWGS84(lat: number, lng: number): boolean {
+  return Math.abs(lat) <= 90 && Math.abs(lng) <= 180;
+}
+
 function getLeadPosition(lead: Lead): { coords: [number, number]; precise: boolean } | null {
-  if (lead.coordinates?.latitude != null && lead.coordinates?.longitude != null) {
+  if (
+    lead.coordinates?.latitude != null &&
+    lead.coordinates?.longitude != null &&
+    isValidWGS84(lead.coordinates.latitude, lead.coordinates.longitude)
+  ) {
     return { coords: [lead.coordinates.latitude, lead.coordinates.longitude], precise: true };
   }
   const city = lead.address?.city;

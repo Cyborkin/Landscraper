@@ -170,6 +170,7 @@ class ArcGISScraper(BaseScraper):
         params = {
             "where": self.config["where"],
             "outFields": self.config["fields"],
+            "outSR": 4326,
             "f": "json",
             "resultRecordCount": 200,
             "orderByFields": "OBJECTID DESC",

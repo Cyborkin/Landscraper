@@ -55,7 +55,11 @@ export default function LeadDetail() {
     fullMark: max,
   }));
 
-  const hasCoords = lead.coordinates?.latitude != null && lead.coordinates?.longitude != null;
+  const hasCoords =
+    lead.coordinates?.latitude != null &&
+    lead.coordinates?.longitude != null &&
+    Math.abs(lead.coordinates.latitude) <= 90 &&
+    Math.abs(lead.coordinates.longitude) <= 180;
 
   return (
     <div className="space-y-6">
