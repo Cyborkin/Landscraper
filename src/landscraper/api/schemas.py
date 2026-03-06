@@ -34,6 +34,7 @@ class LeadOut(BaseModel):
     sources: list[str] = []
     lead_score: int = 0
     tier: str = "cold"
+    score_breakdown: dict[str, int] = {}
     permit_number: str | None = None
     permit_type: str | None = None
     permit_status: str | None = None

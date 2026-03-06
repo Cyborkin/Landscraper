@@ -7,6 +7,8 @@ from contextlib import asynccontextmanager
 from typing import Annotated, Any
 
 from fastapi import Depends, FastAPI, Query
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
 
 from landscraper.api.auth import verify_api_key
 from landscraper.api.schemas import (
@@ -49,6 +51,19 @@ app = FastAPI(
     version="0.1.0",
     lifespan=lifespan,
 )
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+@app.get("/", include_in_schema=False)
+async def root_redirect():
+    return RedirectResponse(url="/dashboard")
 
 
 @app.get("/health", response_model=HealthResponse)
@@ -183,6 +198,7 @@ def _to_lead_out(lead: dict[str, Any]) -> LeadOut:
         sources=lead.get("sources", []),
         lead_score=lead.get("lead_score", 0),
         tier=lead.get("tier", "cold"),
+        score_breakdown=lead.get("score_breakdown", {}),
         permit_number=lead.get("permit_number"),
         permit_type=lead.get("permit_type"),
         permit_status=lead.get("permit_status"),

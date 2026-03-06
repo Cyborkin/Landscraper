@@ -184,6 +184,20 @@ def test_lead_response_structure():
     assert data["coordinates"]["latitude"] == 39.7392
 
 
+def test_lead_includes_score_breakdown():
+    store_leads([{
+        "lead_id": "bd-test",
+        "tier": "hot",
+        "lead_score": 85,
+        "score_breakdown": {"project_scale": 20, "permit_status": 15, "unit_count": 10},
+    }])
+
+    response = client.get("/api/v1/leads/bd-test", headers=AUTH_HEADER)
+    data = response.json()
+    assert data["score_breakdown"]["project_scale"] == 20
+    assert data["score_breakdown"]["permit_status"] == 15
+
+
 def test_tracing_status():
     response = client.get("/api/v1/tracing/status", headers=AUTH_HEADER)
     assert response.status_code == 200
