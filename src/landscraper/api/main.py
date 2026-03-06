@@ -160,6 +160,9 @@ DEFAULT_SOURCES = [
     {"name": "aurora_permits", "access_method": "api"},
     {"name": "denver_residential_permits", "access_method": "api"},
     {"name": "denver_rezoning", "access_method": "api"},
+    {"name": "denver_demolition_permits", "access_method": "api"},
+    {"name": "aurora_dev_applications", "access_method": "api"},
+    {"name": "denver_commercial_permits", "access_method": "api"},
     {
         "name": "bizwest_rss",
         "access_method": "rss",
