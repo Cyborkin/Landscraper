@@ -189,6 +189,16 @@ def update_cycle_status(cycle_id: str, status: str, metrics: dict | None = None)
     })
 
 
+# Serve dashboard SPA if build exists
+_dashboard_dir = os.path.join(
+    os.path.dirname(__file__), "..", "..", "..", "dashboard", "dist"
+)
+if os.path.isdir(_dashboard_dir):
+    from fastapi.staticfiles import StaticFiles
+
+    app.mount("/dashboard", StaticFiles(directory=_dashboard_dir, html=True), name="dashboard")
+
+
 def _to_lead_out(lead: dict[str, Any]) -> LeadOut:
     """Convert internal lead dict to API response model."""
     return LeadOut(
