@@ -156,6 +156,7 @@ DEFAULT_SOURCES = [
     {"name": "census_bps", "access_method": "api"},
     {"name": "dola_demography", "access_method": "api"},
     {"name": "sec_edgar", "access_method": "api"},
+    {"name": "dwr_well_permits", "access_method": "api"},
     {"name": "fred_building_permits", "access_method": "csv"},
     {"name": "fort_collins_permits", "access_method": "api"},
     {"name": "aurora_permits", "access_method": "api"},
@@ -164,6 +165,7 @@ DEFAULT_SOURCES = [
     {"name": "denver_demolition_permits", "access_method": "api"},
     {"name": "aurora_dev_applications", "access_method": "api"},
     {"name": "denver_commercial_permits", "access_method": "api"},
+    {"name": "legistar_planning", "access_method": "api"},
     {
         "name": "bizwest_rss",
         "access_method": "rss",
@@ -274,7 +276,18 @@ _dashboard_candidates = [
 ]
 _dashboard_dir = next((d for d in _dashboard_candidates if os.path.isdir(d)), None)
 if _dashboard_dir:
+    from fastapi.responses import FileResponse
     from fastapi.staticfiles import StaticFiles
+
+    _index_html = os.path.join(_dashboard_dir, "index.html")
+
+    # Catch-all for SPA client-side routes (must be before StaticFiles mount)
+    @app.get("/dashboard/{rest_of_path:path}", include_in_schema=False)
+    async def dashboard_spa(rest_of_path: str):
+        file_path = os.path.join(_dashboard_dir, rest_of_path)
+        if rest_of_path and os.path.isfile(file_path):
+            return FileResponse(file_path)
+        return FileResponse(_index_html)
 
     app.mount("/dashboard", StaticFiles(directory=_dashboard_dir, html=True), name="dashboard")
 
