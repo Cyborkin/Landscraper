@@ -102,16 +102,50 @@ async def collection_specialist_node(state: CollectionTaskState) -> dict[str, An
 
 
 async def pipeline_node(state: LandscraperState) -> dict[str, Any]:
-    """Phase 3: Correlate, aggregate, deduplicate, enrich, and score.
+    """Correlate, deduplicate, enrich, and score raw data into developments.
 
-    Takes raw_data from collection and produces normalized developments/builders.
+    Takes raw_data from collection and produces normalized developments.
     """
-    # TODO Phase 4: Implement correlation, aggregation, dedup, enrichment, scoring
+    from landscraper.pipeline import (
+        correlate_records,
+        deduplicate,
+        enrich_development,
+        score_development,
+    )
+
+    raw_data = state.get("raw_data", [])
+    if not raw_data:
+        return {
+            "current_phase": "consensus",
+            "developments": [],
+            "builders": [],
+            "messages": ["Pipeline: no raw data to process"],
+            "errors": [],
+        }
+
+    # Step 1: Deduplicate
+    unique = deduplicate(raw_data)
+
+    # Step 2: Correlate into groups
+    groups = correlate_records(unique)
+
+    # Step 3: Enrich each group into a development record
+    developments = []
+    for key, records in groups.items():
+        dev = enrich_development(key, records)
+        dev = score_development(dev)
+        developments.append(dev)
+
+    logger.info(
+        "Pipeline: %d raw → %d unique → %d groups → %d developments",
+        len(raw_data), len(unique), len(groups), len(developments),
+    )
+
     return {
         "current_phase": "consensus",
-        "developments": [],
+        "developments": developments,
         "builders": [],
-        "messages": [],
+        "messages": [f"Pipeline produced {len(developments)} developments from {len(raw_data)} raw records"],
         "errors": [],
     }
 
