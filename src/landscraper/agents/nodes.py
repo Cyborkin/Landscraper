@@ -232,13 +232,27 @@ async def self_improvement_node(state: LandscraperState) -> dict[str, Any]:
 
 
 async def delivery_node(state: LandscraperState) -> dict[str, Any]:
-    """Phase 6: Store leads and push to tenants via configured channels.
+    """Store validated leads and update cycle status.
 
-    Creates Lead records in the database and triggers notifications.
+    Creates lead records in the store and triggers notifications.
     """
-    # TODO Phase 8: Implement notification delivery
+    from landscraper.api.main import store_leads, update_cycle_status
+
+    validated = state.get("validated_leads", [])
+    cycle_id = state.get("cycle_id", "unknown")
+
+    if validated:
+        store_leads(validated)
+        logger.info("Delivered %d leads for cycle %s", len(validated), cycle_id)
+
+    update_cycle_status(
+        cycle_id=cycle_id,
+        status="complete",
+        metrics=state.get("cycle_metrics", {}),
+    )
+
     return {
         "current_phase": "complete",
-        "messages": [],
+        "messages": [f"Delivered {len(validated)} leads"],
         "errors": [],
     }
