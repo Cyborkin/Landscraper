@@ -15,16 +15,16 @@ class Development(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 
     # Permit info
     permit_number: Mapped[str | None] = mapped_column(String(100))
-    permit_type: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
-    permit_status: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
-    jurisdiction: Mapped[str] = mapped_column(String(255), nullable=False)
+    permit_type: Mapped[str | None] = mapped_column(String(50), index=True)
+    permit_status: Mapped[str | None] = mapped_column(String(50), index=True)
+    jurisdiction: Mapped[str | None] = mapped_column(String(255))
 
     # Location
     address_street: Mapped[str | None] = mapped_column(String(500))
-    address_city: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    address_city: Mapped[str | None] = mapped_column(String(255), index=True)
     address_state: Mapped[str] = mapped_column(String(2), default="CO", nullable=False)
     address_zip: Mapped[str | None] = mapped_column(String(10))
-    county: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
+    county: Mapped[str | None] = mapped_column(String(100), index=True)
     apn: Mapped[str | None] = mapped_column(String(50))
     latitude: Mapped[float | None] = mapped_column(Float)
     longitude: Mapped[float | None] = mapped_column(Float)
@@ -34,7 +34,7 @@ class Development(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     zoning_proposed: Mapped[str | None] = mapped_column(String(50))
 
     # Project details
-    property_type: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
+    property_type: Mapped[str | None] = mapped_column(String(50), index=True)
     project_name: Mapped[str | None] = mapped_column(String(500))
     description: Mapped[str | None] = mapped_column(Text)
     valuation_usd: Mapped[float | None] = mapped_column(Float)
@@ -70,6 +70,13 @@ class Development(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     # Discovery metadata
     discovered_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     tags: Mapped[list[str] | None] = mapped_column(ARRAY(String))
+
+    # Dedup / scoring
+    content_hash: Mapped[str | None] = mapped_column(String(64), unique=True, index=True)
+    score_breakdown: Mapped[dict | None] = mapped_column(JSONB)
+    validation_status: Mapped[str | None] = mapped_column(String(20))
+    lead_score: Mapped[int | None] = mapped_column(Integer)
+    tier: Mapped[str | None] = mapped_column(String(20), index=True)
 
     leads: Mapped[list["Lead"]] = relationship(back_populates="development")  # noqa: F821
 
