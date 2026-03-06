@@ -151,10 +151,16 @@ DEFAULT_SOURCES = [
         "keywords": ["permit", "development", "construction", "residential", "commercial"],
     },
     {
-        "name": "denver_planning_rss",
+        "name": "colorado_real_estate_journal_rss",
         "access_method": "rss",
-        "url": "https://www.denvergov.org/Government/Agencies-Departments-Offices/Community-Planning-and-Development/rss",
-        "keywords": ["permit", "development", "rezoning", "construction"],
+        "url": "https://crej.com/feed/",
+        "keywords": ["permit", "development", "construction", "residential", "commercial", "mixed-use"],
+    },
+    {
+        "name": "denver_business_journal_rss",
+        "access_method": "rss",
+        "url": "https://www.bizjournals.com/denver/news/rss.xml",
+        "keywords": ["development", "construction", "permit", "residential", "building"],
     },
 ]
 

@@ -1,11 +1,12 @@
 all:
   hosts:
     swarm1:
-      ansible_host: swarm1
+      ansible_host: 192.168.0.111
       ansible_user: swarm
       ansible_become: true
+      ansible_become_password: swarm
   vars:
-    registry: "swarm1:5000"
+    registry: "192.168.0.111:5000"
     landscraper_tag: "latest"
     redis_url: "redis://redis:6379/1"
     db_url: "postgresql+asyncpg://landscraper:landscraper@postgres:5432/landscraper"

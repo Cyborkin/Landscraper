@@ -18,7 +18,7 @@ def _validate_location(dev: dict[str, Any]) -> tuple[str, str]:
     state = dev.get("address_state", "CO")
 
     if not city and not county:
-        return VOTE_REJECT, "No location data (city or county)"
+        return VOTE_FLAG, "No location data (city or county)"
 
     if state and state.upper() != "CO":
         return VOTE_FLAG, f"State is {state}, expected CO"

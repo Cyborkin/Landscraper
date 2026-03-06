@@ -18,22 +18,45 @@
           - gnupg
           - lsb-release
           - software-properties-common
-          - ubuntu-drivers-common
           - pciutils
+          - linux-headers-{{ ansible_kernel }}
         state: present
 
-    # ── NVIDIA GPU drivers ─────────────────────────────────────────
+    # ── NVIDIA GPU drivers (Debian) ────────────────────────────────
     - name: Detect NVIDIA GPU
       ansible.builtin.shell: lspci | grep -i nvidia
       register: nvidia_check
       changed_when: false
       failed_when: false
 
-    - name: Install NVIDIA drivers (auto-detect best)
-      ansible.builtin.command: ubuntu-drivers install
+    - name: Enable contrib and non-free repos for NVIDIA drivers
+      ansible.builtin.replace:
+        path: /etc/apt/sources.list
+        regexp: '(deb\s+http://deb\.debian\.org/debian/?\s+trixie\s+)main.*'
+        replace: '\1main contrib non-free non-free-firmware'
+      when: nvidia_check.rc == 0
+      register: nonfree_added
+
+    - name: Enable contrib and non-free for security repo
+      ansible.builtin.replace:
+        path: /etc/apt/sources.list
+        regexp: '(deb\s+http://security\.debian\.org/debian-security\s+trixie-security\s+)main.*'
+        replace: '\1main contrib non-free non-free-firmware'
+      when: nvidia_check.rc == 0
+
+    - name: Update apt after adding non-free
+      ansible.builtin.apt:
+        update_cache: true
+      when: nonfree_added is changed
+
+    - name: Install NVIDIA driver and CUDA toolkit
+      ansible.builtin.apt:
+        name:
+          - nvidia-driver
+          - nvidia-cuda-toolkit
+        state: present
       when: nvidia_check.rc == 0
       register: nvidia_install
-      changed_when: "'installed' in nvidia_install.stdout | default('')"
 
     - name: Install NVIDIA Container Toolkit key
       ansible.builtin.shell: |
@@ -59,11 +82,16 @@
         update_cache: true
       when: nvidia_check.rc == 0
 
+    - name: Configure NVIDIA Container Toolkit for Docker
+      ansible.builtin.command: nvidia-ctk runtime configure --runtime=docker
+      when: nvidia_check.rc == 0
+      changed_when: true
+
     # ── Docker ─────────────────────────────────────────────────────
     - name: Add Docker GPG key
       ansible.builtin.shell: |
         install -m 0755 -d /etc/apt/keyrings
-        curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+        curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc
         chmod a+r /etc/apt/keyrings/docker.asc
       args:
         creates: /etc/apt/keyrings/docker.asc
@@ -71,7 +99,7 @@
     - name: Add Docker repo
       ansible.builtin.shell: |
         echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] \
-          https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo $VERSION_CODENAME) stable" | \
+          https://download.docker.com/linux/debian $(. /etc/os-release && echo $VERSION_CODENAME) stable" | \
           tee /etc/apt/sources.list.d/docker.list
       args:
         creates: /etc/apt/sources.list.d/docker.list
@@ -104,14 +132,14 @@
         dest: /etc/docker/daemon.json
         content: |
           {
-            "insecure-registries": ["swarm1:5000"],
+            "insecure-registries": ["192.168.0.111:5000"],
+            "default-runtime": "nvidia",
             "runtimes": {
               "nvidia": {
                 "path": "nvidia-container-runtime",
                 "runtimeArgs": []
               }
-            },
-            "default-runtime": "nvidia"
+            }
           }
         mode: "0644"
       notify: Restart Docker
@@ -122,7 +150,7 @@
         dest: /etc/docker/daemon.json
         content: |
           {
-            "insecure-registries": ["swarm1:5000"]
+            "insecure-registries": ["192.168.0.111:5000"]
           }
         mode: "0644"
       notify: Restart Docker
@@ -137,6 +165,8 @@
         restart_policy: always
         ports:
           - "5000:5000"
+        volumes:
+          - registry_data:/var/lib/registry
 
     # ── Ollama ─────────────────────────────────────────────────────
     - name: Install Ollama
@@ -144,22 +174,18 @@
       args:
         creates: /usr/local/bin/ollama
 
-    - name: Create Ollama systemd service
+    - name: Create Ollama systemd override for host binding
+      ansible.builtin.file:
+        path: /etc/systemd/system/ollama.service.d
+        state: directory
+        mode: "0755"
+
+    - name: Configure Ollama to listen on all interfaces
       ansible.builtin.copy:
-        dest: /etc/systemd/system/ollama.service
+        dest: /etc/systemd/system/ollama.service.d/override.conf
         content: |
-          [Unit]
-          Description=Ollama LLM Server
-          After=network-online.target
-
           [Service]
-          ExecStart=/usr/local/bin/ollama serve
-          Restart=always
-          RestartSec=3
           Environment="OLLAMA_HOST=0.0.0.0"
-
-          [Install]
-          WantedBy=multi-user.target
         mode: "0644"
       notify: Restart Ollama
 
@@ -170,12 +196,20 @@
         state: started
         daemon_reload: true
 
-    - name: Pull Qwen 2.5 7B model (fits 12GB GPU)
+    - name: Wait for Ollama to be ready
+      ansible.builtin.uri:
+        url: "http://localhost:11434/api/tags"
+        status_code: 200
+      register: ollama_health
+      retries: 10
+      delay: 3
+      until: ollama_health.status == 200
+
+    - name: Pull Qwen 2.5 7B model (fits 12GB RTX 3060)
       ansible.builtin.command: ollama pull qwen2.5:7b
       register: ollama_pull
-      changed_when: "'pulling' in ollama_pull.stdout | default('')"
-      retries: 3
-      delay: 10
+      changed_when: "'pulling' in ollama_pull.stderr | default('')"
+      timeout: 600
 
     # ── App directory ──────────────────────────────────────────────
     - name: Create app directory
@@ -185,6 +219,23 @@
         owner: swarm
         group: swarm
         mode: "0755"
+
+    # ── Reboot if NVIDIA driver was installed ──────────────────────
+    - name: Reboot to load NVIDIA driver
+      ansible.builtin.reboot:
+        reboot_timeout: 300
+      when: nvidia_install is changed
+
+    - name: Verify NVIDIA driver loaded
+      ansible.builtin.command: nvidia-smi
+      register: nvidia_smi
+      changed_when: false
+      when: nvidia_check.rc == 0
+
+    - name: Show GPU info
+      ansible.builtin.debug:
+        msg: "{{ nvidia_smi.stdout_lines }}"
+      when: nvidia_check.rc == 0
 
   handlers:
     - name: Restart Docker

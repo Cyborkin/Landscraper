@@ -7,7 +7,7 @@ variable "TAG" {
 }
 
 variable "REGISTRY" {
-  default = "swarm1:5000"
+  default = "192.168.0.111:5000"
 }
 
 target "landscraper" {

@@ -34,14 +34,23 @@ class CensusBPSScraper(BaseScraper):
     source_name = "census_bps"
     source_type = "api"
 
-    def __init__(self, year: int = 2025):
+    def __init__(self, year: int | None = None):
         self.year = year
 
     async def scrape(self) -> list[dict[str, Any]]:
-        url = BPS_URL.format(year=self.year)
         async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.get(url)
-            response.raise_for_status()
+            # Try current year down to 2020 until we find published data
+            years_to_try = [self.year] if self.year else list(range(2025, 2019, -1))
+            response = None
+            for yr in years_to_try:
+                url = BPS_URL.format(year=yr)
+                resp = await client.get(url)
+                if resp.status_code == 200:
+                    response = resp
+                    self.year = yr
+                    break
+            if response is None:
+                return []
 
         records = []
         reader = csv.reader(io.StringIO(response.text))
