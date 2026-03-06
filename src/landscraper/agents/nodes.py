@@ -151,16 +151,54 @@ async def pipeline_node(state: LandscraperState) -> dict[str, Any]:
 
 
 async def consensus_node(state: LandscraperState) -> dict[str, Any]:
-    """Phase 4: Cross-validate findings and produce scored leads.
+    """Cross-validate developments and produce scored, validated leads.
 
-    Multiple agents independently evaluate developments before they become leads.
-    Confidence scoring based on source count, reliability, and data freshness.
+    Runs validators and confidence scoring against each development.
+    Only accepted/flagged developments become validated leads.
     """
-    # TODO Phase 5: Implement multi-agent consensus voting
+    from landscraper.consensus import compute_confidence, validate_development
+
+    developments = state.get("developments", [])
+    if not developments:
+        return {
+            "current_phase": "improvement",
+            "validated_leads": [],
+            "messages": ["Consensus: no developments to validate"],
+            "errors": [],
+        }
+
+    validated = []
+    rejected_count = 0
+
+    for dev in developments:
+        # Compute confidence score
+        dev["confidence_score"] = compute_confidence(dev)
+
+        # Re-score with updated confidence (affects scoring factor #9)
+        from landscraper.pipeline.scorer import score_development
+        dev = score_development(dev)
+
+        # Run validators
+        result = validate_development(dev)
+
+        if result["consensus"] == "reject":
+            rejected_count += 1
+            logger.info("Rejected development %s: %s", dev.get("correlation_key"), result["rejection_reasons"])
+            continue
+
+        dev["validation_status"] = result["consensus"]
+        dev["flag_reasons"] = result.get("flag_reasons", [])
+        validated.append(dev)
+
+    logger.info(
+        "Consensus: %d developments → %d validated, %d rejected",
+        len(developments), len(validated), rejected_count,
+    )
+
     return {
         "current_phase": "improvement",
-        "validated_leads": [],
-        "messages": [],
+        "validated_leads": validated,
+        "messages": [f"Consensus validated {len(validated)} leads, rejected {rejected_count}"],
         "errors": [],
     }
 
