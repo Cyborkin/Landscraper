@@ -86,3 +86,12 @@ class TriggerCycleRequest(BaseModel):
 class TracingStatusResponse(BaseModel):
     enabled: bool
     project: str | None = None
+
+
+class CycleHistoryEntry(BaseModel):
+    cycle_id: str
+    status: str
+    started_at: str | None = None
+    completed_at: str | None = None
+    lead_count: int = 0
+    error_count: int = 0

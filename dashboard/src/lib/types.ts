@@ -84,6 +84,15 @@ export interface TierDistribution {
   cold: number;
 }
 
+export interface CycleHistoryEntry {
+  cycle_id: string;
+  status: string;
+  started_at: string | null;
+  completed_at: string | null;
+  lead_count: number;
+  error_count: number;
+}
+
 export interface CycleMetrics {
   total_raw_records: number;
   total_developments: number;

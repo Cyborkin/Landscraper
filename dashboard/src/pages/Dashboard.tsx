@@ -28,10 +28,10 @@ export default function Dashboard() {
       : 0;
 
   const tierData = [
-    { name: "Hot", value: leads.filter((l) => l.tier === "hot").length, color: "amber" },
-    { name: "Warm", value: leads.filter((l) => l.tier === "warm").length, color: "sky" },
-    { name: "Monitor", value: leads.filter((l) => l.tier === "monitor").length, color: "slate" },
-    { name: "Cold", value: leads.filter((l) => l.tier === "cold").length, color: "zinc" },
+    { name: "Hot", value: leads.filter((l) => l.tier === "hot").length },
+    { name: "Warm", value: leads.filter((l) => l.tier === "warm").length },
+    { name: "Monitor", value: leads.filter((l) => l.tier === "monitor").length },
+    { name: "Cold", value: leads.filter((l) => l.tier === "cold").length },
   ].filter((d) => d.value > 0);
 
   const scoreBuckets = [
@@ -73,24 +73,24 @@ export default function Dashboard() {
         <StatCard
           label="Avg Confidence"
           value={`${(avgConfidence * 100).toFixed(0)}%`}
-          accent={avgConfidence >= 0.7 ? "text-primary" : "text-text-secondary"}
+          accent={avgConfidence >= 0.7 ? "text-secondary" : "text-text-secondary"}
         />
       </div>
 
       <div className="grid grid-cols-3 gap-4">
-        <div className="rounded-xl border border-border bg-surface p-5">
+        <div className="rounded-xl border border-border bg-surface p-5 shadow-sm">
           <h3 className="mb-3 text-sm font-medium text-text-secondary">Tier Distribution</h3>
           <DonutChart
             data={tierData}
             category="value"
             index="name"
-            colors={["amber", "sky", "slate", "zinc"]}
+            colors={["red", "orange", "gray", "zinc"]}
             showLabel
             className="h-48"
           />
         </div>
 
-        <div className="rounded-xl border border-border bg-surface p-5">
+        <div className="rounded-xl border border-border bg-surface p-5 shadow-sm">
           <h3 className="mb-3 text-sm font-medium text-text-secondary">Score Distribution</h3>
           <BarChart
             data={scoreBuckets}
@@ -98,19 +98,20 @@ export default function Dashboard() {
             categories={["count"]}
             colors={["emerald"]}
             showLegend={false}
+            showGridLines={false}
             className="h-48"
           />
         </div>
 
-        <div className="rounded-xl border border-border bg-surface p-5">
+        <div className="rounded-xl border border-border bg-surface p-5 shadow-sm">
           <h3 className="mb-3 text-sm font-medium text-text-secondary">Leads by County</h3>
           <BarList data={countyData} color="emerald" className="mt-2" />
         </div>
       </div>
 
-      <div className="rounded-xl border border-border bg-surface p-5">
+      <div className="rounded-xl border border-border bg-surface p-5 shadow-sm">
         <h3 className="mb-3 text-sm font-medium text-text-secondary">Recent Activity</h3>
-        <div className="space-y-2">
+        <div className="space-y-1">
           {recentLeads.map((lead) => (
             <RecentLeadRow key={lead.lead_id} lead={lead} />
           ))}
@@ -125,7 +126,7 @@ export default function Dashboard() {
 
 function RecentLeadRow({ lead }: { lead: Lead }) {
   return (
-    <div className="flex items-center justify-between rounded-lg px-3 py-2 hover:bg-border/50">
+    <div className="flex items-center justify-between rounded-lg px-3 py-2 hover:bg-surface-raised transition-colors">
       <div className="flex items-center gap-3">
         <TierBadge tier={lead.tier} />
         <span className="text-sm text-text-primary">
@@ -136,7 +137,7 @@ function RecentLeadRow({ lead }: { lead: Lead }) {
         </span>
       </div>
       <div className="flex items-center gap-4">
-        <span className="text-sm font-semibold text-text-primary">{lead.lead_score}</span>
+        <span className="text-sm font-semibold data-mono text-text-primary">{lead.lead_score}</span>
         <span className="text-xs text-text-secondary">
           {lead.discovered_at ? new Date(lead.discovered_at).toLocaleDateString() : ""}
         </span>

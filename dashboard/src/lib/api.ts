@@ -1,4 +1,5 @@
 import type {
+  CycleHistoryEntry,
   CycleStatus,
   HealthResponse,
   Lead,
@@ -55,4 +56,8 @@ export async function triggerCycle(): Promise<CycleStatus> {
 
 export async function fetchTracingStatus(): Promise<TracingStatus> {
   return fetchApi("/api/v1/tracing/status");
+}
+
+export async function fetchCycleHistory(): Promise<CycleHistoryEntry[]> {
+  return fetchApi("/api/v1/cycles");
 }

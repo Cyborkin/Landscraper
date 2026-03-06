@@ -6,6 +6,7 @@ import {
   fetchCycleStatus,
   triggerCycle,
   fetchTracingStatus,
+  fetchCycleHistory,
 } from "./api";
 import type { LeadFilters } from "./types";
 
@@ -57,5 +58,13 @@ export function useTracingStatus() {
   return useQuery({
     queryKey: ["tracingStatus"],
     queryFn: fetchTracingStatus,
+  });
+}
+
+export function useCycleHistory() {
+  return useQuery({
+    queryKey: ["cycleHistory"],
+    queryFn: fetchCycleHistory,
+    refetchInterval: 30_000,
   });
 }

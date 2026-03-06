@@ -22,7 +22,7 @@ export default function LeadExplorer() {
   return (
     <div className="space-y-4">
       {/* Map */}
-      <div className="h-72 overflow-hidden rounded-xl border border-border">
+      <div className="h-72 overflow-hidden rounded-xl border border-border shadow-sm">
         <LeadMap
           leads={leads}
           selectedId={selectedLeadId}
@@ -30,7 +30,7 @@ export default function LeadExplorer() {
         />
       </div>
 
-      <div className="flex items-center gap-3 rounded-xl border border-border bg-surface p-3">
+      <div className="flex items-center gap-3 rounded-xl border border-border bg-surface p-3 shadow-sm">
         <Select
           label="Tier"
           value={filters.tier ?? ""}
@@ -54,9 +54,9 @@ export default function LeadExplorer() {
             onChange={(e) =>
               setFilters((f) => ({ ...f, min_score: Number(e.target.value) || undefined }))
             }
-            className="w-24 accent-primary"
+            className="w-24 accent-secondary"
           />
-          <span className="w-6 text-xs text-text-secondary">{filters.min_score ?? 0}</span>
+          <span className="w-6 text-xs data-mono text-text-secondary">{filters.min_score ?? 0}</span>
         </div>
       </div>
 
@@ -64,7 +64,7 @@ export default function LeadExplorer() {
         {data?.meta.total_count ?? 0} leads found
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-border bg-surface">
+      <div className="overflow-hidden rounded-xl border border-border bg-surface shadow-sm">
         <table className="w-full text-left text-sm">
           <thead>
             <tr className="border-b border-border text-xs uppercase text-text-secondary">
@@ -93,16 +93,16 @@ export default function LeadExplorer() {
                 <tr
                   key={lead.lead_id}
                   onClick={() => navigate(`/dashboard/leads/${lead.lead_id}`)}
-                  className="cursor-pointer border-b border-border/50 transition-colors hover:bg-border/30"
+                  className="cursor-pointer border-b border-border/50 transition-colors hover:bg-surface-raised"
                 >
-                  <td className="px-4 py-3"><ScoreBar score={lead.lead_score} /></td>
+                  <td className="px-4 py-3 data-mono"><ScoreBar score={lead.lead_score} /></td>
                   <td className="px-4 py-3"><TierBadge tier={lead.tier} /></td>
-                  <td className="px-4 py-3 text-text-primary">{lead.address?.city ?? "—"}</td>
-                  <td className="px-4 py-3 text-text-secondary">{lead.address?.county ?? "—"}</td>
-                  <td className="px-4 py-3 text-text-secondary">{lead.property_type ?? "—"}</td>
-                  <td className="px-4 py-3 text-text-secondary">{(lead.confidence_score * 100).toFixed(0)}%</td>
-                  <td className="px-4 py-3 text-text-secondary">
-                    {lead.valuation_usd ? `$${(lead.valuation_usd / 1_000_000).toFixed(1)}M` : "—"}
+                  <td className="px-4 py-3 text-text-primary">{lead.address?.city ?? "\u2014"}</td>
+                  <td className="px-4 py-3 text-text-secondary">{lead.address?.county ?? "\u2014"}</td>
+                  <td className="px-4 py-3 text-text-secondary">{lead.property_type ?? "\u2014"}</td>
+                  <td className="px-4 py-3 text-text-secondary data-mono">{(lead.confidence_score * 100).toFixed(0)}%</td>
+                  <td className="px-4 py-3 text-text-secondary data-mono">
+                    {lead.valuation_usd ? `$${(lead.valuation_usd / 1_000_000).toFixed(1)}M` : "\u2014"}
                   </td>
                 </tr>
               ))
@@ -116,7 +116,7 @@ export default function LeadExplorer() {
 
 function ScoreBar({ score }: { score: number }) {
   const color =
-    score >= 80 ? "bg-hot" : score >= 50 ? "bg-warm" : score >= 20 ? "bg-monitor" : "bg-cold";
+    score >= 80 ? "bg-hot" : score >= 50 ? "bg-warm" : score >= 20 ? "bg-secondary" : "bg-cold";
   return (
     <div className="flex items-center gap-2">
       <div className="h-1.5 w-16 overflow-hidden rounded-full bg-border">
@@ -141,7 +141,7 @@ function Select({
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="rounded-md border border-border bg-background px-2 py-1 text-xs text-text-primary focus:border-primary focus:outline-none"
+        className="rounded-md border border-border bg-surface px-2 py-1 text-xs text-text-primary focus:border-secondary focus:outline-none"
       >
         {options.map((o) => (
           <option key={o.value} value={o.value}>{o.label}</option>

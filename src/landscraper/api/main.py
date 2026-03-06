@@ -1,10 +1,10 @@
 """FastAPI application entry point."""
 
-import asyncio
 import logging
 import os
 import uuid
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 from typing import Annotated, Any
 
 from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Query
@@ -15,6 +15,7 @@ from landscraper.api.auth import verify_api_key
 from landscraper.api.schemas import (
     AddressOut,
     CoordinatesOut,
+    CycleHistoryEntry,
     CycleStatusResponse,
     HealthResponse,
     LeadListResponse,
@@ -33,6 +34,8 @@ from landscraper.models.lead import Lead
 logger = logging.getLogger(__name__)
 
 _last_cycle: dict[str, Any] = {"cycle_id": None, "status": "idle", "metrics": {}}
+_cycle_history: list[dict[str, Any]] = []
+MAX_CYCLE_HISTORY = 20
 
 
 @asynccontextmanager
@@ -82,7 +85,8 @@ async def root_redirect():
 
 @app.get("/health", response_model=HealthResponse)
 async def health():
-    return HealthResponse(status="ok", version="0.1.0")
+    """Health check — no auth required (used by Railway, Docker HEALTHCHECK)."""
+    return HealthResponse(status="ok", version="0.1.0", cycle_count=len(_cycle_history))
 
 
 @app.get("/api/v1/leads", response_model=LeadListResponse)
@@ -205,6 +209,17 @@ async def trigger_cycle(
         "metrics": {},
     })
 
+    _cycle_history.insert(0, {
+        "cycle_id": cycle_id,
+        "status": "running",
+        "started_at": datetime.now(timezone.utc).isoformat(),
+        "completed_at": None,
+        "lead_count": 0,
+        "error_count": 0,
+    })
+    if len(_cycle_history) > MAX_CYCLE_HISTORY:
+        _cycle_history.pop()
+
     background_tasks.add_task(_run_cycle, cycle_id, sources)
     return CycleStatusResponse(**_last_cycle)
 
@@ -233,11 +248,14 @@ async def _run_cycle(cycle_id: str, sources: list[dict[str, Any]]) -> None:
     try:
         logger.info("Cycle %s: starting with %d sources", cycle_id, len(sources))
         result = await graph.ainvoke(initial_state, config=run_config)
-        logger.info(
-            "Cycle %s: complete — %d leads delivered",
-            cycle_id,
-            len(result.get("validated_leads", [])),
-        )
+        lead_count = len(result.get("validated_leads", []))
+        logger.info("Cycle %s: complete — %d leads delivered", cycle_id, lead_count)
+        for entry in _cycle_history:
+            if entry["cycle_id"] == cycle_id:
+                entry["status"] = "completed"
+                entry["completed_at"] = datetime.now(timezone.utc).isoformat()
+                entry["lead_count"] = lead_count
+                break
     except Exception as e:
         logger.error("Cycle %s: failed — %s", cycle_id, e, exc_info=True)
         _last_cycle.update({
@@ -245,6 +263,20 @@ async def _run_cycle(cycle_id: str, sources: list[dict[str, Any]]) -> None:
             "status": "error",
             "metrics": {"error": str(e)},
         })
+        for entry in _cycle_history:
+            if entry["cycle_id"] == cycle_id:
+                entry["status"] = "error"
+                entry["completed_at"] = datetime.now(timezone.utc).isoformat()
+                entry["error_count"] = 1
+                break
+
+
+@app.get("/api/v1/cycles", response_model=list[CycleHistoryEntry])
+async def list_cycles(
+    tenant: Annotated[dict, Depends(verify_api_key)],
+):
+    """List recent cycle runs (most recent first, in-memory, max 20)."""
+    return [CycleHistoryEntry(**entry) for entry in _cycle_history]
 
 
 @app.get("/api/v1/tracing/status", response_model=TracingStatusResponse)

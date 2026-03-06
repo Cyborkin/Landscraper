@@ -13,7 +13,7 @@ import {
 import { MapContainer, TileLayer, CircleMarker } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 
-const TILE_URL = "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
+const TILE_URL = "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png";
 
 const FACTOR_MAX: Record<string, number> = {
   project_scale: 20,
@@ -63,7 +63,7 @@ export default function LeadDetail() {
       <div className="flex items-center gap-4">
         <button
           onClick={() => navigate("/dashboard/leads")}
-          className="flex h-8 w-8 items-center justify-center rounded-lg border border-border text-text-secondary hover:bg-border hover:text-text-primary"
+          className="flex h-8 w-8 items-center justify-center rounded-lg border border-border text-text-secondary hover:bg-surface-raised hover:text-text-primary transition-colors"
         >
           <ArrowLeft size={16} />
         </button>
@@ -77,7 +77,7 @@ export default function LeadDetail() {
         </div>
         <TierBadge tier={lead.tier} />
         <div className="text-right">
-          <p className="text-3xl font-bold text-text-primary">{lead.lead_score}</p>
+          <p className="text-3xl font-bold data-mono text-text-primary">{lead.lead_score}</p>
           <p className="text-xs text-text-secondary">/ 100</p>
         </div>
       </div>
@@ -89,22 +89,22 @@ export default function LeadDetail() {
           <Card title="Scoring Breakdown">
             <ResponsiveContainer width="100%" height={300}>
               <RadarChart data={radarData}>
-                <PolarGrid stroke="#1e293b" />
-                <PolarAngleAxis dataKey="factor" tick={{ fill: "#94a3b8", fontSize: 11 }} />
+                <PolarGrid stroke="#D1D5DB" />
+                <PolarAngleAxis dataKey="factor" tick={{ fill: "#4B5563", fontSize: 11 }} />
                 <PolarRadiusAxis angle={90} domain={[0, "dataMax"]} tick={false} axisLine={false} />
-                <Radar name="Score" dataKey="score" stroke="#10b981" fill="#10b981" fillOpacity={0.2} strokeWidth={2} />
+                <Radar name="Score" dataKey="score" stroke="#4F7C59" fill="#4F7C59" fillOpacity={0.2} strokeWidth={2} />
               </RadarChart>
             </ResponsiveContainer>
           </Card>
 
           <Card title="Source Corroboration">
             <div className="flex items-center gap-2">
-              <span className="text-2xl font-bold text-primary">{lead.source_count}</span>
+              <span className="text-2xl font-bold data-mono text-secondary">{lead.source_count}</span>
               <span className="text-sm text-text-secondary">sources</span>
             </div>
             <div className="mt-2 flex flex-wrap gap-1.5">
               {lead.sources.map((src) => (
-                <span key={src} className="rounded-md border border-border bg-background px-2 py-0.5 text-xs text-text-secondary">
+                <span key={src} className="rounded-md border border-border bg-surface-raised px-2 py-0.5 text-xs text-text-secondary">
                   {src}
                 </span>
               ))}
@@ -115,6 +115,12 @@ export default function LeadDetail() {
             <div className="mt-3">
               <ConfidenceMeter value={lead.confidence_score} />
             </div>
+            <p className="mt-3 text-[11px] leading-relaxed text-text-secondary">
+              Confidence is a weighted composite of source corroboration (40%), field
+              completeness across 12 tracked data points (40%), and a data consistency
+              audit that penalizes conflicting or invalid records (20%). Higher scores
+              indicate the lead is well-documented across multiple authoritative sources.
+            </p>
           </Card>
         </div>
 
@@ -127,15 +133,20 @@ export default function LeadDetail() {
                   center={[lead.coordinates.latitude!, lead.coordinates.longitude!]}
                   zoom={13}
                   className="h-full w-full"
-                  style={{ background: "#020617" }}
+                  style={{ background: "#F9FAFB" }}
                   zoomControl={false}
                   attributionControl={false}
                 >
                   <TileLayer url={TILE_URL} />
                   <CircleMarker
                     center={[lead.coordinates.latitude!, lead.coordinates.longitude!]}
-                    radius={8}
-                    pathOptions={{ color: "#10b981", fillColor: "#10b981", fillOpacity: 0.6 }}
+                    radius={10}
+                    pathOptions={{
+                      color: "#FFFFFF",
+                      fillColor: lead.lead_score >= 70 ? "#16A34A" : lead.lead_score >= 55 ? "#4F7C59" : lead.lead_score >= 45 ? "#E67E22" : lead.lead_score >= 30 ? "#DC2626" : "#9CA3AF",
+                      fillOpacity: 0.85,
+                      weight: 2,
+                    }}
                   />
                 </MapContainer>
               </div>
@@ -183,7 +194,7 @@ export default function LeadDetail() {
 
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-xl border border-border bg-surface p-5">
+    <div className="rounded-xl border border-border bg-surface p-5 shadow-sm">
       <h3 className="mb-3 text-sm font-medium text-text-secondary">{title}</h3>
       {children}
     </div>
@@ -205,12 +216,12 @@ function InfoGrid({ items }: { items: [string, string | null | undefined][] }) {
 
 function ConfidenceMeter({ value }: { value: number }) {
   const pct = Math.round(value * 100);
-  const color = value >= 0.7 ? "bg-primary" : value >= 0.4 ? "bg-warm" : "bg-error";
+  const color = value >= 0.7 ? "bg-secondary" : value >= 0.4 ? "bg-warm" : "bg-error";
   return (
     <div>
       <div className="flex justify-between text-xs">
         <span className="text-text-secondary">Confidence</span>
-        <span className="font-semibold text-text-primary">{pct}%</span>
+        <span className="font-semibold data-mono text-text-primary">{pct}%</span>
       </div>
       <div className="mt-1 h-2 overflow-hidden rounded-full bg-border">
         <div className={`h-full rounded-full ${color}`} style={{ width: `${pct}%` }} />
